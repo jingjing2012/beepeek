@@ -56,7 +56,7 @@ def price_tag(df, price_col, price_list_col):
         else:
             labels.append(str(i + 1) + ":" + str(price_list[i]) + "-" + str(price_list[i + 1]))
     price_list.pop()
-    # price_list.append(price.max() * 10)
+    price_list.append(price.max() * 10)
     df['price_tag'] = pd.cut(x=price, bins=price_list, labels=labels)
     # df[['price_tag_rank', 'price_tag']] = df['price_tag'].str.split(':', expand=True)
     return df

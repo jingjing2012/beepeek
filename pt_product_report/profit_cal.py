@@ -294,6 +294,6 @@ def profit_cal(price, product_fee, freight_fee, freight_fee_air, fba_fee, vat):
     # 空运
     profit_air_rate = 1 - (product_fee_rate + freight_fee_air_rate + fba_fee_rate + para.referral_fee_rate
                            + para.exchange_loss_rate + para.return_rate + vat)
-    profit_air = price * profit_rate
+    profit_air = price * profit_air_rate
     return product_fee_rate, freight_fee_rate, freight_fee_air_rate, fba_fee_rate, profit_rate, profit, \
            profit_air_rate, profit_air
