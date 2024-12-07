@@ -76,6 +76,7 @@ def model_predict(df, model_name):
     return predict_y
 
 
+"""
 # 机器学习训练数据准备
 df_group_knn = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                              sql.sampling_knn_sql)
@@ -93,3 +94,4 @@ df_predict = df_group[
 sql_engine.data_to_sql(df_predict, path.product_group_sampling_predict, 'append', config.connet_product_db_sql)
 
 print('done')
+"""

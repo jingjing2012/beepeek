@@ -120,9 +120,9 @@ df_price_tag = df_price_list.groupby(df_price_list['data_id']).apply(
 df_competitiors = pd.merge(df_competitiors, df_price_tag, how='left', on=['data_id', 'price'])
 
 # 竞争力分组
-common_util.get_cut(df_ai, 'overall_competitiveness', 'competitive_tag', [-99, -0.5, 0.5, 1, 99],
+df_ai['competitive_tag']=common_util.get_cut(df_ai, 'overall_competitiveness', [-99, -0.5, 0.5, 1, 99],
                     ['软柿子', '实力相当', '慎重选择', '硬茬'])
-common_util.get_cut(df_ai, 'similarity_score', 'similarity_tag', [0, 4, 7, 10], ['低相似', '中等相似', '高相似'])
+df_ai['similarity_tag']=common_util.get_cut(df_ai, 'similarity_score', [0, 4, 7, 10], ['低相似', '中等相似', '高相似'])
 
 # 星数分级
 cal_util.get_mround(df_competitiors, 'ratings', 'ratings_tag', 100)

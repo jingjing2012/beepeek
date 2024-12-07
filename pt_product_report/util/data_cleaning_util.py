@@ -26,9 +26,16 @@ def convert_type(df, con_str, d):
 
 
 # 字符串类型修正
-def convert_str(df, con_str):
+def convert_str_lower(df, con_str):
     df[con_str] = df[con_str].astype(str)
     df[con_str] = df[con_str].str.lower()
+    df[con_str] = df[con_str].str.strip()
+    return df[con_str]
+
+
+# 字符串类型修正
+def convert_str(df, con_str):
+    df[con_str] = df[con_str].astype(str)
     df[con_str] = df[con_str].str.strip()
     return df[con_str]
 

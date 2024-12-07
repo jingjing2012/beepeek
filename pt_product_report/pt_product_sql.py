@@ -417,18 +417,18 @@ update_position_sql2 = 'UPDATE ' + path.expand_competitors + ' SET tag_status=-1
                                                              '(SELECT expand_competitors_id FROM pt_clue_tag)'
 
 update_position_sql3 = 'UPDATE ' + path.expand_competitors + ' SET profit_status=1 WHERE asin IN' \
-                                                       '(SELECT ASIN FROM pt_clue_profit)'
+                                                             '(SELECT ASIN FROM pt_clue_profit)'
 
 # sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin where clue_status=1'
 sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin'
 # 店铺挖掘
 sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE brand_status + seller_status = 2'
 
-# sql_seller_product = 'SELECT ' + path.pt_sellers_product + '.* FROM ' + path.pt_sellers_insight + ' LEFT JOIN ' \
-#                      + path.pt_sellers_product + ' ON ' + path.pt_sellers_insight + '.`name`=' \
-#                      + path.pt_sellers_product + '.buybox_seller WHERE ' + path.pt_sellers_insight + '.`status`=1 AND ' \
-#                      + path.pt_sellers_product + '.id>0'
-
+sql_seller_product = 'SELECT * FROM ' + path.pt_sellers_product + ' LEFT JOIN ' + path.pt_brand_competing_report + \
+                    ' ON ' + path.pt_sellers_product + '.task_tag = ' + path.pt_brand_competing_report + '.task_tag ' + \
+                    'WHERE ' + path.pt_sellers_product + '.id IS NULL AND ' + \
+                    path.pt_sellers_product + '.brand_status + ' + path.pt_sellers_product + '.seller_status = 2 and ' \
+                    + path.pt_sellers_product + '.task_tag="某杂货公司"'
 
 # 状态码更新
 sql_report_brand_status = 'UPDATE pt_sellers_product INNER JOIN pt_brand_insight ON ' \

@@ -1,5 +1,6 @@
 import pandas as pd
 import pymysql
+import mysql.connector
 from sqlalchemy import create_engine
 from better.conn import mysql_config as config
 
@@ -10,6 +11,17 @@ def connect_pt_product(hostname, password, databasename, product_sql_pt):
     with create_conn(conn_str) as conn_oe:
         df = pd.read_sql(product_sql_pt, conn_oe)
     return df
+
+# 分页查询
+def connect_pt_product_page(hostname, password, database, product_sql_pt):
+    conn_pt = mysql.connector.connect(host=hostname, user=config.oe_username, password=password, database=database)
+    cur = conn_pt.cursor()
+    cur.execute(product_sql_pt)
+    result = cur.fetchall()
+    df_result = pd.DataFrame(result, columns=[i[0] for i in cur.description])
+    cur.close()
+    conn_pt.close()
+    return df_result
 
 
 # 数据库操作

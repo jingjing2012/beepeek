@@ -6,9 +6,8 @@ import pandas as pd
 
 
 # 数据打标签
-def get_cut(df, col, col_cut, bins_cut, labels_cut):
-    df[col_cut] = pd.cut(df[col], bins_cut, labels=labels_cut, include_lowest=True)
-    return df[col_cut]
+def get_cut(df, col_str, bins_cut, labels_cut):
+    return pd.cut(df[col_str], bins_cut, right=False, labels=labels_cut, include_lowest=True)
 
 
 # 检查是否包含中文字符

@@ -229,8 +229,7 @@ df_product = sql_engine.connect_pt_product(config.sellersprite_hostname, config.
                                            config.clue_self_database, sql.sql_asin_self)
 
 df_relation = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                            config.clue_self_database,
-                                            sql.sql_traffic_self)
+                                            config.clue_self_database, sql.sql_traffic_self)
 
 if df_relation.empty:
     print('df_relation.empty')

@@ -182,7 +182,7 @@ df_product['预估FBA占比'] = np.where(df_product['fba_fees'] * 1 > 0,
                                  np.fmin(1, df_product['fba_fees'] / df_product['price']), para.fba_fees_rate)
 df_product['预估头程占比'] = np.where(df_product['预估FBA占比'] * 1 > 0, np.fmin(1, df_product['预估FBA占比'] / 2.5),
                                 para.pre_fees_rate)
-df_product['预估货值占比'] = common_util.get_cut(df_product, 'price', '预估货值占比', [0, 6, 10, 15, 30, 50, 100, 200, 9999],
+df_product['预估货值占比'] = common_util.get_cut(df_product, 'price', [0, 6, 10, 15, 30, 50, 100, 200, 9999],
                                            [0.08, 0.1, 0.15, 0.2, 0.25, 0.27, 0.3, 0.35])
 df_product['预估货值占比'] = data_cleaning_util.convert_type(df_product, '预估货值占比', 2)
 

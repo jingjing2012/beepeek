@@ -33,6 +33,32 @@ def hhi_cal(df, hhi_cal_col):
     return df_hhi
 
 
+def weight_value_clean(df, weight, dimensions):
+    for error_unit, replacement in para.replace_error_dict.items():
+        df['weight'] = df['weight'].str.replace(error_unit, replacement, regex=False)
+
+    # 一次性分割并创建新列
+    weight_split = df['weight'].str.split(" ", expand=True)
+    df['重量值'] = weight_split[0]
+    df['单位'] = weight_split[1]
+
+    # 去除不合法单位和重量值
+    df.loc[~df['单位'].isin(para.replace_weight_unit_list), '单位'] = np.nan
+    df['重量值判断'] = df['重量值'].str.replace(".", "")
+    df.loc[~df['重量值判断'].str.isdecimal(), '重量值'] = "-1"
+    df['重量值'] = np.where(df['重量值判断'] == "-1", np.nan, df['重量值'])
+
+    # 计算换算值
+    df['换算'] = df['单位'].replace(para.replace_dict, regex=False)
+
+    # 计算重量
+    df['重量(g)'] = np.where(df['重量值'].astype(float) * 1 > 0, round(df['重量值'].astype(float) * df['换算'].astype(float), 4),
+                           np.nan)
+
+def dimensions_value_clean(df, weight, dimensions):
+    pass
+
+
 # 状态码更新
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
                            sql.sql_report_brand_status)
@@ -44,6 +70,10 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
                            sql.sql_seller_seller_status)
 
 # 数据连接
+df_seller_product = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                                  config.clue_shop_database, sql.sql_seller_product)
+
+"""
 df_brand_report = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                                 config.clue_shop_database, sql.sql_brand_report)
 
@@ -51,7 +81,7 @@ df_brand_report = sql_engine.connect_pt_product(config.sellersprite_hostname, co
 df_brand_report['task_asin'] = df_brand_report['asin'] + ' | ' + df_brand_report['task_tag']
 df_brand_report['buybox_seller_id'] = df_brand_report['buybox_seller'] + ' | ' + df_brand_report['task_tag']
 
-duplicate_util.df_cleaning(df_brand_report, 'task_asin')
+df_brand_report = duplicate_util.df_cleaning(df_brand_report, 'task_asin')
 
 report_list_0 = ['sales', 'monthly_revenue', 'variations', 'ratings']
 for i in report_list_0:
@@ -122,31 +152,22 @@ df_category_hhi = hhi_cal(df_brand_report, 'category')
 df_brand_hhi = hhi_cal(df_brand_report, 'brand')
 
 # 数据打标
-df_brand_report['revenue_tag'] = common_util.get_cut(df_brand_report, 'monthly_revenue', 'revenue_tag',
-                                                     para.revenue_list, para.revenue_tag)
-df_brand_report['revenue_tag_rank'] = common_util.get_cut(df_brand_report, 'monthly_revenue', 'revenue_tag_rank',
-                                                          para.revenue_list, para.revenue_tag_rank)
+df_brand_report['revenue_tag'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list, para.revenue_tag)
+df_brand_report['revenue_tag_rank'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list, para.revenue_tag_rank)
 
-df_brand_report['month_available_tag'] = common_util.get_cut(df_brand_report, 'month_available', 'month_available_tag',
-                                                             para.month_available_list, para.month_available_tag)
-df_brand_report['month_available_tag_rank'] = common_util.get_cut(df_brand_report, 'month_available',
-                                                                  'month_available_tag_rank', para.month_available_list,
+df_brand_report['month_available_tag'] = common_util.get_cut(df_brand_report, 'month_available', para.month_available_list, para.month_available_tag)
+df_brand_report['month_available_tag_rank'] = common_util.get_cut(df_brand_report, 'month_available',para.month_available_list,
                                                                   para.month_available_tag_rank)
 
-df_brand_report['price_tag'] = common_util.get_cut(df_brand_report, 'price', 'price_tag', para.price_list,
+df_brand_report['price_tag'] = common_util.get_cut(df_brand_report, 'price', para.price_list,
                                                    para.price_tag)
-df_brand_report['price_tag_rank'] = common_util.get_cut(df_brand_report, 'price', 'price_tag_rank', para.price_list,
-                                                        para.price_tag_rank)
+df_brand_report['price_tag_rank'] = common_util.get_cut(df_brand_report, 'price', para.price_list,para.price_tag_rank)
 
-df_brand_report['rating_tag'] = common_util.get_cut(df_brand_report, 'rating', 'rating_tag', para.rating_list,
-                                                    para.rating_tag)
-df_brand_report['rating_tag_rank'] = common_util.get_cut(df_brand_report, 'rating', 'rating_tag_rank', para.rating_list,
-                                                         para.rating_tag_rank)
+df_brand_report['rating_tag'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list,para.rating_tag)
+df_brand_report['rating_tag_rank'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list,para.rating_tag_rank)
 
-df_brand_report['ratings_tag'] = common_util.get_cut(df_brand_report, 'ratings', 'ratings_tag', para.ratings_list,
-                                                     para.ratings_tag)
-df_brand_report['ratings_tag_rank'] = common_util.get_cut(df_brand_report, 'ratings', 'ratings_tag_rank',
-                                                          para.ratings_list, para.ratings_tag_rank)
+df_brand_report['ratings_tag'] = common_util.get_cut(df_brand_report, 'ratings', para.ratings_list,para.ratings_tag)
+df_brand_report['ratings_tag_rank'] = common_util.get_cut(df_brand_report, 'ratings',para.ratings_list, para.ratings_tag_rank)
 
 # B+等级产品占比
 df_brand_report_b = df_brand_report[df_brand_report['monthly_revenue'] >= 6000]
@@ -237,3 +258,4 @@ sql_engine.data_to_sql(df_seller, path.pt_sellers_tag, 'append', config.connet_c
 # 状态更新
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
                            sql.update_brand_report_sql)
+"""

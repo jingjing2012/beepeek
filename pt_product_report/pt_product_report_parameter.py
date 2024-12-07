@@ -1000,3 +1000,9 @@ ratings_tag_rank = [1, 2, 3, 4, 5, 6, 7, 8]
 
 # 店铺类型划分
 seller_tag = ['大牌/精品店', '小爆款/旗舰店', '精铺店', '直发杂货店', '泛铺FBA', '跟卖店']
+
+# FBA费用计算单位转换
+ounce_pound = 0.0625
+gram_pound = 0.00220462
+kilogram_pound = 2.20462
+pound_pound = 1
