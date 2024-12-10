@@ -1,12 +1,15 @@
-import pymysql
 import conn.mysql_config as config
+import pymysql
+import re
 
+"""
 db_config = {
     "host": config.sellersprite_hostname,
     "user": config.sellersprite_username,
     "password": config.sellersprite_password,
     "database": "pt_report_temp",
 }
+"""
 
 
 def extract_table_sql_from_large_file(file_path, table_name):
@@ -36,39 +39,54 @@ def extract_table_sql_from_large_file(file_path, table_name):
     return "\n".join(table_sql)
 
 
+def remove_column_from_sql(sql_content, column_name):
+    """
+    从SQL中删除指定列的定义和插入数据
+    :param sql_content: 原始SQL内容
+    :param column_name: 要删除的列名
+    :return: 修改后的SQL内容
+    """
+    # 删除CREATE TABLE中对列的定义
+    create_table_pattern = re.compile(rf"`{column_name}`.*?,")
+    sql_content = create_table_pattern.sub("", sql_content)
+
+    # 删除INSERT INTO中列的引用和数据
+    insert_into_pattern = re.compile(
+        rf"(INSERT INTO `.*?`\s*\(.*?){column_name},(.*?\))", re.DOTALL
+    )
+    sql_content = insert_into_pattern.sub(r"\1\2", sql_content)
+
+    value_pattern = re.compile(
+        rf"(\(.*?),.*?,(.*?\))", re.DOTALL
+    )
+    sql_content = value_pattern.sub(r"\1\2", sql_content)
+
+    return sql_content
+
+
 def restore_table_to_mysql(sql_content, db_config, target_table_name):
     """
     将提取的SQL内容恢复到目标MySQL数据库表
     """
     sql_content = sql_content.replace("pt_product_report", target_table_name)
 
-    try:
-        connection = pymysql.connect(
-            host=db_config["host"],
-            user=db_config["user"],
-            password=db_config["password"],
-            database=db_config["database"]
-        )
-    except pymysql.err.OperationalError as e:
-        print(f"Database connection failed: {e}")
-        raise
+    connection = pymysql.connect(
+        host=db_config["host"],
+        user=db_config["user"],
+        password=db_config["password"],
+        database=db_config["database"]
+    )
 
     try:
         with connection.cursor() as cursor:
-            # 删除目标表（如存在）
-            try:
-                cursor.execute(f"DROP TABLE IF EXISTS `{target_table_name}`")
-            except pymysql.err.InternalError as e:
-                print(f"Failed to drop existing table `{target_table_name}`: {e}")
-                raise
+            cursor.execute(f"DROP TABLE IF EXISTS `{target_table_name}`")
 
-            # 执行SQL语句
             statements = sql_content.split(";")
             for statement in statements:
                 statement = statement.strip()
                 if statement:
-                    print(f"Executing statement: {statement[:100]}...")
                     try:
+                        print(f"Executing statement: {statement[:100]}...")
                         cursor.execute(statement)
                     except pymysql.err.ProgrammingError as e:
                         print(f"SQL syntax error in statement: {statement[:100]}...")
@@ -97,6 +115,9 @@ db_config = {
 try:
     print("Extracting table SQL from source file...")
     table_sql = extract_table_sql_from_large_file(sql_file_path, source_table)
+
+    print("Removing seller_info column...")
+    table_sql = remove_column_from_sql(table_sql, "seller_info")
 
     print("Restoring table to MySQL...")
     restore_table_to_mysql(table_sql, db_config, target_table)
