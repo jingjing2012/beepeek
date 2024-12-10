@@ -11,7 +11,7 @@ import pt_product_report_parameter as para
 import pt_product_report_path as path
 import pt_product_sql as sql
 import pt_group_knn as knn
-from util import duplicate_util, data_cleaning_util, calculate_util, calculation_util, common_util
+from util import duplicate_util, data_cleaning_util, calculate_util, calculation_util, common_util, db_util
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -32,21 +32,23 @@ warnings.filterwarnings("ignore", message="DataFrame is highly fragmented.", cat
 pd.set_option('future.no_silent_downcasting', True)
 
 # 创建索引
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                           sql.create_index_sql_relevance_1)
-
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                           sql.create_index_sql_relevance_2)
-
 # sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-#                 sql.create_index_sql_supplement)
+#                            sql.create_index_sql_relevance_1)
+#
 # sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-#                 sql.duplicate_sql_supplement)
+#                            sql.create_index_sql_relevance_2)
 
+
+"""
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+                sql.create_index_sql_supplement)
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+                sql.duplicate_sql_supplement)
+"""
 # 总数据量
-total_rows = 800000
+total_rows = 600000
 # 每页查询的数据量
-page_size = 5000
+page_size = 3000
 # 需要查询的总页数
 total_pages = total_rows // page_size + 1
 
@@ -72,28 +74,30 @@ for page in range(total_pages):
     # 执行查询操作
     # 1.数据连接
     start_time = time.time()
-    sql_asin = 'select asin as "related_asin",price,recommend,blue_ocean_estimate from ' + path.pt_product_get_group + \
-               ' where `status`=1 limit ' + str(page_size) + ' offset ' + str(start_index)
-    sql_relevance = 'SELECT ' + path.pt_relevance_asins + '.* FROM (' + sql_asin + ') pt_product LEFT JOIN ' + \
-                    path.pt_relevance_asins + ' ON pt_product.related_asin = ' + path.pt_relevance_asins + '.asin'
-    sql_traffic = 'SELECT pt_relevance.asin as "related_asin",pt_relevance.relevance,pt_relevance.category_relevance,' \
-                  + path.pt_relation_traffic + '.*,SUBSTRING_INDEX(' + path.pt_relation_traffic + \
-                  '.category_path,":",2) as "二级类目" FROM( ' + sql_relevance + ' ) pt_relevance LEFT JOIN ' + \
-                  path.pt_relation_traffic + ' ON pt_relevance.relation_traffic_id = ' + path.pt_relation_traffic + \
-                  '.id WHERE pt_relevance.id>0'
-    # sql_traffic_add = 'SELECT ' + path.supplement_competitors + '.clue_asin as related_asin,' \
-    #                   + path.supplement_competitors + '.*,SUBSTRING_INDEX(' + path.supplement_competitors + \
-    #                   '.category_path,":",2) as "二级类目" FROM ( ' + sql_asin + ' ) pt_asin LEFT JOIN ' \
-    #                   + path.supplement_competitors + ' ON pt_asin.related_asin=' + path.supplement_competitors + \
-    #                   '.clue_asin WHERE supplement_competitors.id>0'
 
     df_product = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
-                                                    config.sellersprite_database, sql_asin)
+                                                    config.sellersprite_database,
+                                                    db_util.group_asin_sql(page_size, start_index))
+
     if df_product.empty:
         break
 
+    df_duplicate = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
+                                                      config.sellersprite_database,
+                                                      db_util.group_duplicate_sql(page_size, start_index,
+                                                                                  path.pt_product_duplicate))
+
     df_relation = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
-                                                     config.sellersprite_database, sql_traffic)
+                                                     config.sellersprite_database,
+                                                     db_util.group_traffic_sql(page_size, start_index,
+                                                                               path.pt_relevance_asins,
+                                                                               path.pt_relation_traffic))
+
+    df_relation_old = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
+                                                         config.sellersprite_database,
+                                                         db_util.group_traffic_sql(page_size, start_index,
+                                                                                   path.pt_relevance_asins_old,
+                                                                                   path.pt_relation_traffic_old))
     # df_relation_add = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
     #                                      config.sellersprite_database, sql_traffic_add)
 
@@ -101,6 +105,8 @@ for page in range(total_pages):
 
     # 2.数据预处理
     start_time = time.time()
+    # df_relation_old.pop('traffic_id')
+    df_relation = pd.concat([df_relation, df_relation_old])
     # 字段整理
     df_relation['ASIN'] = df_relation['asin']
     df_relation = df_relation[(df_relation['relevance'] >= 0.5) & (df_relation['category_relevance'] >= 0)]
@@ -125,15 +131,15 @@ for page in range(total_pages):
 
     product_con_list_2 = ['sales', 'qa', 'ratings', 'variations']
     for con_j in product_con_list_2:
-        data_cleaning_util.convert_type(df_related_traffic, con_j, 0)
+        df_related_traffic[con_j] = data_cleaning_util.convert_type(df_related_traffic, con_j, 0)
 
-    data_cleaning_util.convert_type(df_related_traffic, 'reviews_rate', 4)
-    data_cleaning_util.convert_type(df_related_traffic, 'rating', 1)
+    df_related_traffic['reviews_rate'] = data_cleaning_util.convert_type(df_related_traffic, 'reviews_rate', 4)
+    df_related_traffic['rating'] = data_cleaning_util.convert_type(df_related_traffic, 'rating', 1)
 
     product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'parent', 'seller_type',
                           'buybox_seller', 'ac_keyword', 'weight', '二级类目']
     for con_l in product_con_list_3:
-        data_cleaning_util.convert_str(df_related_traffic, con_l)
+        df_related_traffic[con_l] = data_cleaning_util.convert_str(df_related_traffic, con_l)
 
     product_con_list_5 = ['title', 'category_path', 'category', 'sub_category', 'ac_keyword', 'weight', '二级类目']
     for con_lower in product_con_list_5:
@@ -141,15 +147,15 @@ for page in range(total_pages):
 
     product_con_list_4 = ['date_available', 'update_time']
     for con_h in product_con_list_4:
-        data_cleaning_util.convert_date(df_related_traffic, con_h)
+        df_related_traffic[con_h] = data_cleaning_util.convert_date(df_related_traffic, con_h)
 
     # data_cleaning_util.percent_convert(df_related_traffic, 'monthly_revenue_increase')
-    data_cleaning_util.convert_type(df_related_traffic, 'sales_growth', 4)
+    df_related_traffic['sales_growth'] = data_cleaning_util.convert_type(df_related_traffic, 'sales_growth', 4)
     df_related_traffic['monthly_revenue_increase'] = df_related_traffic['sales_growth']
 
-    data_cleaning_util.convert_str(df_famous_brand, 'brand')
-    data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
-    data_cleaning_util.convert_str(df_holiday, '节日关键词')
+    df_famous_brand['brand'] = data_cleaning_util.convert_str(df_famous_brand, 'brand')
+    df_famous_brand['疑似知名品牌'] = data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
+    df_holiday['节日关键词'] = data_cleaning_util.convert_str(df_holiday, '节日关键词')
     df_holiday['节日关键词'] = df_holiday['节日关键词'].str.lower()
 
     for error_u, replace_m in para.replace_related_type_dict.items():
@@ -216,10 +222,10 @@ for page in range(total_pages):
         df_main_weight['换算'] = df_main_weight['单位'].replace(para.replace_dict, regex=False)
 
         # 计算重量
-        df_main_weight['重量(g)'] = np.where(df_main_weight['重量值'].astype(float) * 1 > 0,
-                                           round(
-                                               df_main_weight['重量值'].astype(float) * df_main_weight['换算'].astype(float),
-                                               4), np.nan)
+        df_main_weight['重量值'] = df_main_weight['重量值'].astype(float)
+        df_main_weight['换算'] = df_main_weight['换算'].astype(float)
+        df_main_weight['重量(g)'] = np.where(df_main_weight['重量值'].astype(float) * 1 > 0, round(
+            df_main_weight['重量值'].astype(float) * df_main_weight['换算'].astype(float), 4), np.nan)
     else:
         # 如果DataFrame为空，创建空的DataFrame并设置重量列为NaN
         df_main_weight = pd.DataFrame(columns=df_main.columns)
@@ -237,7 +243,7 @@ for page in range(total_pages):
                                     para.pre_fees_rate)
     df_traffic['预估货值占比'] = common_util.get_cut(df_traffic, 'price', [0, 6, 10, 15, 30, 50, 100, 200, 9999],
                                                [0.08, 0.1, 0.15, 0.2, 0.25, 0.27, 0.3, 0.35])
-    data_cleaning_util.convert_type(df_traffic, '预估货值占比', 2)
+    df_traffic['预估货值占比'] = data_cleaning_util.convert_type(df_traffic, '预估货值占比', 2)
 
     df_traffic['预估毛利率_FBM'] = df_traffic['gross_margin'] - df_traffic['预估头程占比'] * 2 - para.product_fees_rate
     df_traffic['预估毛利率_FBA'] = df_traffic['gross_margin'] - df_traffic['预估头程占比'] - para.product_fees_rate
@@ -378,7 +384,7 @@ for page in range(total_pages):
 
     df_recommend['推荐度'] = df_recommend.dot(recommend_weights)
     df_recommend['推荐度'] = df_recommend['推荐度'].fillna(0)
-    data_cleaning_util.convert_type(df_recommend, '推荐度', 1)
+    df_recommend['推荐度'] = data_cleaning_util.convert_type(df_recommend, '推荐度', 1)
 
     df_recommend = df_recommend[['id', '推荐度']]
     df_traffic = df_traffic.merge(df_recommend, how='left', on='id')
@@ -400,7 +406,7 @@ for page in range(total_pages):
     product_con_list = ['预估FBA占比', '预估头程占比', '预估毛利率', '毛估资金利用率', '销额级数', '高资金利用率', '高销低LQS', '类轻小直发FBM', '平均变体月销额等级',
                         '新品爬坡快', '长期上架少Q&A']
     for con_k in product_con_list:
-        data_cleaning_util.convert_type(df_traffic, con_k, 4)
+        df_traffic[con_k] = data_cleaning_util.convert_type(df_traffic, con_k, 4)
 
     print("推荐度计算用时：" + (time.time() - start_time).__str__())
 
@@ -964,24 +970,25 @@ for page in range(total_pages):
     traffic_list_0 = ['TOP5月均销额', 'TOP5月销额', '利基月GMV', '直发FBM月均销额', '冒出品低星款数', '非TOP5月均销额', '动销品变体中位数',
                       '新品平均月销额', '平均星数', '重复利基']
     for traffic_i in traffic_list_0:
-        data_cleaning_util.convert_type(traffic_df, traffic_i, 0)
+        traffic_df[traffic_i] = data_cleaning_util.convert_type(traffic_df, traffic_i, 0)
 
     traffic_list_1 = ['综合竞品推荐度', 'TOP5平均LQS', '冒出品平均LQS', '平均开售月数']
     for traffic_j in traffic_list_1:
-        data_cleaning_util.convert_type(traffic_df, traffic_j, 1)
+        traffic_df[traffic_j] = data_cleaning_util.convert_type(traffic_df, traffic_j, 1)
 
     traffic_list_2 = ['综合竞品推荐度', '有销额竞品款数占比', '价格中位数', '预估平均资金利用率', '加权FBA运费', '动销品平均星级', 'TOP5销额占比', '非TOP5销额占比',
                       '代表度', 'P得分', 'M得分', 'PMI得分']
     for traffic_k in traffic_list_2:
-        data_cleaning_util.convert_type(traffic_df, traffic_k, 2)
+        traffic_df[traffic_k] = data_cleaning_util.convert_type(traffic_df, traffic_k, 2)
 
     traffic_list_3 = ['达标推荐度占比', '价格集中度', '预估平均毛利率', 'FBM配送占比', '直发FBM产品占比', '直发FBM销额占比', 'AMZ直营销额占比', '大牌商标销额占比',
                       '中国卖家占比', '冒出品A+占比', '冒出品视频占比', '冒出品QA占比', '冒出品低星占比', '冒出品新品占比', '销级星数比', '三标新品占比', '月销增长率',
                       '加权留评率']
     for traffic_l in traffic_list_3:
-        data_cleaning_util.convert_type(traffic_df, traffic_l, 3)
+        traffic_df[traffic_l] = data_cleaning_util.convert_type(traffic_df, traffic_l, 3)
 
-    df_group = traffic_df.merge(df_product, how='left', on='related_asin')
+    df_group = traffic_df.merge(df_product, how='left', on='related_asin').merge(df_duplicate, how='left',
+                                                                                 on='related_asin')
 
     # -------------------------------V2版本-------------------------34个维度聚合------------------------------------
 
@@ -1154,13 +1161,16 @@ for page in range(total_pages):
          '直发FBM产品占比', '直发FBM销额占比', '直发FBM月均销额', 'blue_ocean_estimate', 'AMZ直营销额占比', '大牌商标销额占比', '中国卖家占比', 'TOP5平均LQS',
          '冒出品平均LQS', '冒出品A+占比', '冒出品视频占比', '冒出品QA占比', '动销品平均星级', '冒出品低星款数', '冒出品低星占比', 'TOP5销额占比', '非TOP5销额占比',
          '非TOP5月均销额', '动销品变体中位数', '平均开售月数', '冒出品新品占比', '新品平均月销额', '平均星数', '销级星数比', '三标新品占比', '月销增长率', '加权留评率', 'P得分',
-         'M得分', 'PMI得分', 'P标签', 'M标签', 'I标签', '推荐级别v2', '综合投票分', '综合推荐级别', '代表节点', '代表度', '重复利基', 'asin', '数据更新时间']]
+         'M得分', 'PMI得分', 'P标签', 'M标签', 'I标签', '推荐级别v2', '综合投票分', '综合推荐级别', '代表节点', '代表度', 'pmi_rank', 'duplicate_tag',
+         'duplicate_type', 'asin', '数据更新时间']]
     df_group = duplicate_util.df_cleaning(df_group, 'related_asin')
 
     df_group.rename(columns={'related_asin': '原ASIN',
                              'price': '价格',
                              'recommend': '原ASIN推荐度',
                              'blue_ocean_estimate': '广告蓝海度',
+                             'duplicate_tag': '重复度',
+                             'duplicate_type': '重复利基',
                              'asin': 'ASINs'}, inplace=True)
 
     # 聚合tag表
@@ -1179,9 +1189,9 @@ for page in range(total_pages):
     print("字段整合用时：" + (time.time() - start_time).__str__())
 
     # 机器学习预测
-    # for model_name in models.keys():
-    #     # df_group.insert(loc=0, column='idx', value=df_group.index)
-    #     df_group[f'{model_name}_predict'] = knn.model_predict(df_group, model_name)
+    for model_name in models.keys():
+        # df_group.insert(loc=0, column='idx', value=df_group.index)
+        df_group[f'{model_name}_predict'] = knn.model_predict(df_group, model_name)
 
     # 8.存入数据库
     start_time = time.time()
@@ -1193,6 +1203,7 @@ for page in range(total_pages):
     print("数据入库用时：" + (time.time() - start_time).__str__())
 print("用时：" + (time.time() - start_time).__str__())
 
+"""
 # 类目利基去重
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.pmi_rank_sql)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql1)
@@ -1207,6 +1218,6 @@ sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql8)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql9)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql10)
-
+"""
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database,
                            sql.update_sql_product_group_tag)

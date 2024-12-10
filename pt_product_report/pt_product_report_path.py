@@ -7,11 +7,14 @@ pt_product_get_group = 'pt_product_get_group'
 pt_product_duplicate='pt_product_duplicate'
 
 pt_keywords = 'pt_keywords'
-# pt_keywords_new = 'pt_keywords'
 cpc_from_keywords = 'cpc_from_keywords'
 pt_relation_traffic = 'pt_relation_traffic'
 pt_relevance_asins = 'pt_relevance_asins'
 supplement_competitors = 'supplement_competitors'
+
+# pt_keywords_new = 'pt_keywords'
+pt_relation_traffic_old = 'pt_relation_traffic_old'
+pt_relevance_asins_old = 'pt_relevance_asins_old'
 
 product_famous_brand = 'brand'
 product_holiday = 'holiday'

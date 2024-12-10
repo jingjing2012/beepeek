@@ -133,7 +133,7 @@ CREATE TABLE `cpc_from_keywords` (
 
 insert_sql_cpc_from_keywords = """
 INSERT INTO cpc_from_keywords ( `id`, `keyword`, `auxiliary_k`, `bid_rangeMedian`, `bid_rangeEnd` ) (
-	SELECT DISTINCT
+    SELECT DISTINCT
 		`sellersprite_cpc`.`cpc_from_keywords`.`id` AS `id`,
 		`sellersprite_cpc`.`cpc_from_keywords`.`keyword` AS `keyword`,
 		`sellersprite_cpc`.`cpc_from_keywords`.`auxiliary_k` AS `auxiliary_k`,
@@ -202,6 +202,159 @@ SELECT DISTINCT
 sql_group = "SELECT * FROM pt_product_get_group"
 
 # sql_group = "SELECT id,asin,price,recommend,blue_ocean_estimate,sub_category,fba_fees FROM pt_product_get_group limit 5000"
+
+# 将上个月数据写入
+
+# 创建表
+create_sql_pt_relevance_asins_old = """
+CREATE TABLE `pt_relevance_asins_old` (
+  `id` bigint NOT NULL DEFAULT '1' COMMENT '主键',
+  `relation_traffic_id` bigint NOT NULL COMMENT '关联流量id',
+  `product_report_id` bigint NOT NULL COMMENT '关键词反查id',
+  `asin` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '关联ASIN',
+  `category_relevance` int DEFAULT NULL COMMENT '相关性',
+  `relevance` double DEFAULT NULL COMMENT '关联度',
+  `data_sources_type` int DEFAULT '0' COMMENT '0: 关联流量 1:竞品数据',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_asin` (`asin`),
+  KEY `idx_relation_traffic_id` (`relation_traffic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='关联度计算中间表_上个月';
+"""
+
+create_sql_pt_relation_traffic_old = """
+CREATE TABLE `pt_relation_traffic_old` (
+  `traffic_id` bigint NOT NULL AUTO_INCREMENT,
+  `id` bigint NOT NULL DEFAULT '1' COMMENT '主键',
+  `asin` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT 'ASIN',
+  `related_asin_num` int DEFAULT NULL COMMENT '关联ASIN数',
+  `related_asins` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '关联ASIN',
+  `related_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '关联类型',
+  `sku` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'SKU',
+  `brand` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '品牌',
+  `title` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '商品标题',
+  `product_link` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '商品详情链接',
+  `image` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '商品主图',
+  `parent` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '父体',
+  `category_path` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '类目路径',
+  `category` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '大类目',
+  `category_bsr` bigint DEFAULT NULL COMMENT '大类BSR',
+  `category_bsr_increase` int DEFAULT NULL COMMENT '大类BSR增长数',
+  `category_bsr_growth` double DEFAULT NULL COMMENT '大类BSR增长率',
+  `sub_category` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '小类目',
+  `sub_category_bsr` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '小类BSR',
+  `sales` int DEFAULT NULL COMMENT '月销量',
+  `sales_growth` double DEFAULT NULL COMMENT '月销量增长率',
+  `monthly_revenue` int DEFAULT NULL COMMENT '月销售额',
+  `monthly_revenue_increase` varchar(6) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '月销售额增长率',
+  `variation_sold` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '子体销量',
+  `variation_revenue` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '子体销售额($)',
+  `price` double DEFAULT NULL COMMENT '价格',
+  `qa` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Q&A',
+  `gross_margin` double DEFAULT NULL COMMENT '毛利率',
+  `fba_fees` double DEFAULT NULL COMMENT 'FBA运费',
+  `ratings` int DEFAULT NULL COMMENT '评分数',
+  `reviews_rate` double DEFAULT NULL COMMENT '留评率',
+  `rating` double DEFAULT NULL COMMENT '评分',
+  `monthly_rating_increase` int DEFAULT NULL COMMENT '月新增评分数',
+  `date_available` date DEFAULT NULL COMMENT '上架时间',
+  `seller_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '配送方式',
+  `lqs` int DEFAULT NULL COMMENT 'LQS',
+  `variations` int DEFAULT NULL COMMENT '变体数',
+  `sellers` int DEFAULT NULL COMMENT '卖家数',
+  `buybox_seller` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'BuyBox卖家',
+  `buybox_location` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '卖家所属地',
+  `seller_info` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci COMMENT '卖家信息',
+  `buybox_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'BuyBox类型',
+  `best_seller` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Best Seller标识',
+  `ac` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'Amazon s Choice',
+  `new_release` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'New Release标识',
+  `ebc_available` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'A+页面',
+  `video_available` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '视频介绍',
+  `ac_keyword` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'AC关键词',
+  `weight` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '重量',
+  `dimensions` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '体积',
+  `update_time` date DEFAULT NULL COMMENT '引流时间',
+  PRIMARY KEY (`traffic_id`) USING BTREE,
+  KEY `id` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='卖家精灵关联流量_上个月';
+"""
+
+# 写入表
+insert_sql_pt_relevance_asins_old = \
+    "INSERT INTO sellersprite_202411.`pt_relevance_asins_old` " + \
+    "( `relation_traffic_id`, `product_report_id`, `asin`, `category_relevance`, `relevance` ) (" + \
+    "SELECT distinct " \
+    "pt_relevance_asins.`relation_traffic_id`," \
+    "pt_relevance_asins.`product_report_id`," \
+    "pt_relevance_asins.`asin`," \
+    "pt_relevance_asins.`category_relevance`," \
+    "pt_relevance_asins.`relevance` " \
+    "FROM " \
+    + config.sellersprite_database + ".pt_product_get_group INNER JOIN " \
+    + config.sellersprite_database_old + ".pt_relevance_asins ON " \
+    + config.sellersprite_database + ".pt_product_get_group.asin = " \
+    + config.sellersprite_database_old + ".pt_relevance_asins.asin);"
+
+insert_sql_pt_relation_traffic_old = \
+    'INSERT INTO `pt_relation_traffic_old` (' + \
+    '`id`,' + \
+    '`asin`,' + \
+    '`related_asin_num`,' + \
+    '`related_asins`,' + \
+    '`related_type`,' + \
+    '`sku`,' + \
+    '`brand`,' + \
+    '`title`,' + \
+    '`product_link`,' + \
+    '`image`,' + \
+    '`parent`,' + \
+    '`category_path`,' + \
+    '`category`,' + \
+    '`category_bsr`,' + \
+    '`category_bsr_increase`,' + \
+    '`category_bsr_growth`,' + \
+    '`sub_category`,' + \
+    '`sub_category_bsr`,' + \
+    '`sales`,' + \
+    '`sales_growth`,' + \
+    '`monthly_revenue`,' + \
+    '`monthly_revenue_increase`,' + \
+    '`variation_sold`,' + \
+    '`variation_revenue`,' + \
+    '`price`,' + \
+    '`qa`,' + \
+    '`gross_margin`,' + \
+    '`fba_fees`,' + \
+    '`ratings`,' + \
+    '`reviews_rate`,' + \
+    '`rating`,' + \
+    '`monthly_rating_increase`,' + \
+    '`date_available`,' + \
+    '`seller_type`,' + \
+    '`lqs`,' + \
+    '`variations`,' + \
+    '`sellers`,' + \
+    '`buybox_seller`,' + \
+    '`buybox_location`,' + \
+    '`seller_info`,' + \
+    '`buybox_type`,' + \
+    '`best_seller`,' + \
+    '`ac`,' + \
+    '`new_release`,' + \
+    '`ebc_available`,' + \
+    '`video_available`,' + \
+    '`ac_keyword`,' + \
+    '`weight`,' + \
+    '`dimensions`,' + \
+    '`update_time`' + \
+    ')(SELECT DISTINCT ' + config.sellersprite_database_old + '.pt_relation_traffic.* FROM ' + \
+    config.sellersprite_database + '.pt_product_get_group INNER JOIN ' + \
+    config.sellersprite_database_old + '.pt_relevance_asins ON ' + \
+    config.sellersprite_database + '.pt_product_get_group.asin=' + \
+    config.sellersprite_database_old + '.pt_relevance_asins.asin INNER JOIN ' + \
+    config.sellersprite_database_old + '.pt_relation_traffic ON ' + \
+    config.sellersprite_database_old + '.pt_relevance_asins.relation_traffic_id=' + \
+    config.sellersprite_database_old + '.pt_relation_traffic.id);'
 
 # 自主提报表
 create_sql_group_self = "CREATE TABLE `pt_clue_asin` (" \
@@ -425,10 +578,10 @@ sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,pri
 sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE brand_status + seller_status = 2'
 
 sql_seller_product = 'SELECT * FROM ' + path.pt_sellers_product + ' LEFT JOIN ' + path.pt_brand_competing_report + \
-                    ' ON ' + path.pt_sellers_product + '.task_tag = ' + path.pt_brand_competing_report + '.task_tag ' + \
-                    'WHERE ' + path.pt_sellers_product + '.id IS NULL AND ' + \
-                    path.pt_sellers_product + '.brand_status + ' + path.pt_sellers_product + '.seller_status = 2 and ' \
-                    + path.pt_sellers_product + '.task_tag="某杂货公司"'
+                     ' ON ' + path.pt_sellers_product + '.task_tag = ' + path.pt_brand_competing_report + '.task_tag ' + \
+                     'WHERE ' + path.pt_sellers_product + '.id IS NULL AND ' + \
+                     path.pt_sellers_product + '.brand_status + ' + path.pt_sellers_product + '.seller_status = 2 and ' \
+                     + path.pt_sellers_product + '.task_tag="某杂货公司"'
 
 # 状态码更新
 sql_report_brand_status = 'UPDATE pt_sellers_product INNER JOIN pt_brand_insight ON ' \

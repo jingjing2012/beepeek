@@ -16,7 +16,7 @@ import pt_product_report_path as path
 def model_prepare(df):
     # 数据清洗
     df = df.drop(df.columns[0:2], axis=1)
-    df = df.drop(df.columns[44:60], axis=1)
+    df = df.drop(df.columns[43:62], axis=1)
     # df = df.drop(df.columns[0:10], axis=1)
     # df = df.drop(df.columns[36:52], axis=1)
     df_train = df.drop('冒出品低星款数', axis=1)
@@ -37,7 +37,7 @@ def model_parameter():
                                                          min_samples_split=5),
         'randomforestclassifier': RandomForestClassifier(random_state=42, criterion='gini', max_depth=15,
                                                          n_estimators=200),
-        'kneighborsclassifier': KNeighborsClassifier(n_neighbors=9)
+        # 'kneighborsclassifier': KNeighborsClassifier(n_neighbors=9)
     }
     return models
 
@@ -68,8 +68,8 @@ def model_predict(df, model_name):
     test_x = model_prepare(df)
 
     # 加载训练时的列名并对齐
-    feature_columns = joblib.load('feature_columns.pkl')
-    test_x = test_x[feature_columns]  # 确保测试数据和训练数据列名一致
+    # feature_columns = joblib.load('feature_columns.pkl')
+    # test_x = test_x[feature_columns]  # 确保测试数据和训练数据列名一致
 
     pipeline = joblib.load(f'{model_name}_pipeline.pkl')
     predict_y = pipeline.predict(test_x)
