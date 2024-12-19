@@ -413,7 +413,7 @@ duplicate_sql3 = 'UPDATE product_group_history SET `重复利基`=2 WHERE `数�
                  'ORDER BY `PMI得分` DESC) "pmi_rank" FROM product_group_history LEFT JOIN product_report_history ' \
                  'ON product_group_history.`原ASIN`=product_report_history.ASIN AND product_group_history.`数据更新时间` ' \
                  '=product_report_history.`数据更新时间` WHERE product_group_history.`数据更新时间`="' + str(update_date) + \
-                 '" AND product_group_history.`有销额竞品款数`>=10) group_duplicate WHERE pmi_rank>1)'
+                 '" AND product_group_history.`有销额竞品款数`>=10) group_duplicate WHERE pmi_rank>2)'
 
 # 历史开售产品去重
 duplicate_sql4 = 'UPDATE product_group_history SET `重复利基`=3 WHERE `数据更新时间`="' + str(update_date) + \
@@ -577,11 +577,35 @@ sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,pri
 # 店铺挖掘
 sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE brand_status + seller_status = 2'
 
-sql_seller_product = 'SELECT * FROM ' + path.pt_sellers_product + ' LEFT JOIN ' + path.pt_brand_competing_report + \
-                     ' ON ' + path.pt_sellers_product + '.task_tag = ' + path.pt_brand_competing_report + '.task_tag ' + \
-                     'WHERE ' + path.pt_sellers_product + '.id IS NULL AND ' + \
-                     path.pt_sellers_product + '.brand_status + ' + path.pt_sellers_product + '.seller_status = 2 and ' \
-                     + path.pt_sellers_product + '.task_tag="某杂货公司"'
+sql_seller_product = """
+SELECT DISTINCT
+	asin,
+	price,
+	rating,
+	ratings,
+	date_available,
+	seller_type,
+	weight,
+	dimensions,
+	task_tag 
+FROM
+	pt_sellers_product 
+WHERE
+	brand_status + seller_status = 2 
+	AND price > 0 
+	AND seller_type != "AMZ" 
+	AND ratings > 0 
+	AND rating >= 3.2 
+	AND weight IS NOT NULL 
+	AND dimensions IS NOT NULL 
+	AND asin NOT IN (
+	SELECT DISTINCT
+		asin 
+	FROM
+		pt_brand_competing_report 
+	WHERE
+	task_tag IN ( SELECT DISTINCT task_tag FROM pt_sellers_product WHERE brand_status + seller_status = 2)) 
+"""
 
 # 状态码更新
 sql_report_brand_status = 'UPDATE pt_sellers_product INNER JOIN pt_brand_insight ON ' \
@@ -609,4 +633,7 @@ sql_seller_seller_status = 'UPDATE pt_brand_competing_report INNER JOIN pt_selle
                            'AND pt_brand_competing_report.seller_status=0;'
 
 update_brand_report_sql = 'UPDATE ' + path.pt_brand_competing_report + \
+                          ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
+
+update_seller_product_sql = 'UPDATE ' + path.pt_sellers_product + \
                           ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'

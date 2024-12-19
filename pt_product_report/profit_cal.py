@@ -1,7 +1,54 @@
 import numpy as np
-import pandas as pd
 
 import pt_product_report_parameter as para
+
+
+def weight_value_clean(df):
+    for weight_error_unit, weight_replacement in para.replace_weight_error_dict.items():
+        df['weight_clean'] = df['weight'].str.replace(weight_error_unit, weight_replacement, regex=False)
+        df['weight_clean'] = df['weight_clean'].str.strip()
+
+    # 一次性分割并创建新列
+    weight_split = df['weight_clean'].str.split(" ", expand=True)
+    df['weight_value'] = weight_split[0]
+    df['weight_unit'] = weight_split[1]
+
+    # 去除不合法单位和重量值
+    df.loc[~df['weight_unit'].isin(para.replace_weight_unit_list), 'weight_unit'] = np.nan
+    df['weight_value_judge'] = df['weight_value'].str.replace(".", "")
+    df.loc[~df['weight_value_judge'].str.isdecimal(), 'weight_value'] = "-1"
+    df['weight_value'] = np.where(df['weight_value_judge'] == "-1", np.nan, df['weight_value'])
+
+    # 计算换算值
+    df['weight_exchange'] = df['weight_unit'].replace(para.replace_weight_dict, regex=False)
+
+    # 计算重量
+    df['weight(g)'] = np.where(df['weight_value'].astype(float) * 1 > 0,
+                               round(df['weight_value'].astype(float) * df['weight_exchange'].astype(float), 4), np.nan)
+    return df
+
+
+def dimensions_value_clean(df):
+    # 一次性分割并创建新列
+    dimensions_split = df['dimensions'].str.split("x", expand=True)
+    for mer in [1, 2, 3]:
+        df[f'dimensions_clean_{mer}'] = dimensions_split[mer - 1]
+        df[f'dimensions_clean_{mer}'] = df[f'dimensions_clean_{mer}'].str.strip()
+        df[f'dimensions_value_{mer}'] = df[f'dimensions_clean_{mer}'].str.extract(r'(\d+\.?\d*)')
+        # 格式清洗
+        df[f'dimensions_value_{mer}'] = df[f'dimensions_value_{mer}'].astype(float)
+        df[f'dimensions_value_{mer}'] = df[f'dimensions_value_{mer}'].fillna(0.01)
+        # 计算长度
+        df[f'dimensions_value_cm_{mer}'] = df[f'dimensions_value_{mer}'] * para.inche_cm
+    return df
+
+
+def dimensions_value_sort(df, dimensions_value_1, dimensions_value_2, dimensions_value_3):
+    df['max_length_cm'] = np.fmax(df[dimensions_value_1], df[dimensions_value_2], df[dimensions_value_3])
+    df['min_length_cm'] = np.fmin(df[dimensions_value_1], df[dimensions_value_2], df[dimensions_value_3])
+    df['mid_length_cm'] = (df[dimensions_value_1] + df[dimensions_value_2] + df[dimensions_value_3]) - (
+            df['max_length_cm'] + df['min_length_cm'])
+    return df
 
 
 # 指标转换及计算_美国站

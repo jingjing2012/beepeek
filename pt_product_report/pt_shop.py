@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import warnings
 
 from conn import mysql_config as config, sql_engine
 from util import data_cleaning_util as clean_util, common_util, duplicate_util
 import pt_product_sql as sql
+import profit_cal
 import pt_product_report_path as path
 import pt_product_report_parameter as para
 
@@ -33,31 +35,8 @@ def hhi_cal(df, hhi_cal_col):
     return df_hhi
 
 
-def weight_value_clean(df, weight, dimensions):
-    for error_unit, replacement in para.replace_error_dict.items():
-        df['weight'] = df['weight'].str.replace(error_unit, replacement, regex=False)
-
-    # 一次性分割并创建新列
-    weight_split = df['weight'].str.split(" ", expand=True)
-    df['重量值'] = weight_split[0]
-    df['单位'] = weight_split[1]
-
-    # 去除不合法单位和重量值
-    df.loc[~df['单位'].isin(para.replace_weight_unit_list), '单位'] = np.nan
-    df['重量值判断'] = df['重量值'].str.replace(".", "")
-    df.loc[~df['重量值判断'].str.isdecimal(), '重量值'] = "-1"
-    df['重量值'] = np.where(df['重量值判断'] == "-1", np.nan, df['重量值'])
-
-    # 计算换算值
-    df['换算'] = df['单位'].replace(para.replace_dict, regex=False)
-
-    # 计算重量
-    df['重量(g)'] = np.where(df['重量值'].astype(float) * 1 > 0, round(df['重量值'].astype(float) * df['换算'].astype(float), 4),
-                           np.nan)
-
-def dimensions_value_clean(df, weight, dimensions):
-    pass
-
+# 临时忽略 SettingWithCopyWarning
+warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 # 状态码更新
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
@@ -70,12 +49,11 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
                            sql.sql_seller_seller_status)
 
 # 数据连接
-df_seller_product = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                  config.clue_shop_database, sql.sql_seller_product)
-
-"""
 df_brand_report = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                                 config.clue_shop_database, sql.sql_brand_report)
+
+df_seller_product = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                                  config.clue_shop_database, sql.sql_seller_product)
 
 # 数据格式清洗
 df_brand_report['task_asin'] = df_brand_report['asin'] + ' | ' + df_brand_report['task_tag']
@@ -92,6 +70,11 @@ for j in report_list_2:
     clean_util.convert_type(df_brand_report, j, 2)
 
 clean_util.convert_str(df_brand_report, 'category')
+
+clean_util.convert_str_lower(df_seller_product, 'weight')
+clean_util.convert_str_lower(df_seller_product, 'dimensions')
+clean_util.convert_str(df_seller_product, 'seller_type')
+clean_util.convert_type(df_seller_product, 'price', 2)
 
 # 新品数计算
 month_available(df_brand_report)
@@ -152,22 +135,28 @@ df_category_hhi = hhi_cal(df_brand_report, 'category')
 df_brand_hhi = hhi_cal(df_brand_report, 'brand')
 
 # 数据打标
-df_brand_report['revenue_tag'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list, para.revenue_tag)
-df_brand_report['revenue_tag_rank'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list, para.revenue_tag_rank)
+df_brand_report['revenue_tag'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list,
+                                                     para.revenue_tag)
+df_brand_report['revenue_tag_rank'] = common_util.get_cut(df_brand_report, 'monthly_revenue', para.revenue_list,
+                                                          para.revenue_tag_rank)
 
-df_brand_report['month_available_tag'] = common_util.get_cut(df_brand_report, 'month_available', para.month_available_list, para.month_available_tag)
-df_brand_report['month_available_tag_rank'] = common_util.get_cut(df_brand_report, 'month_available',para.month_available_list,
+df_brand_report['month_available_tag'] = common_util.get_cut(df_brand_report, 'month_available',
+                                                             para.month_available_list, para.month_available_tag)
+df_brand_report['month_available_tag_rank'] = common_util.get_cut(df_brand_report, 'month_available',
+                                                                  para.month_available_list,
                                                                   para.month_available_tag_rank)
 
 df_brand_report['price_tag'] = common_util.get_cut(df_brand_report, 'price', para.price_list,
                                                    para.price_tag)
-df_brand_report['price_tag_rank'] = common_util.get_cut(df_brand_report, 'price', para.price_list,para.price_tag_rank)
+df_brand_report['price_tag_rank'] = common_util.get_cut(df_brand_report, 'price', para.price_list, para.price_tag_rank)
 
-df_brand_report['rating_tag'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list,para.rating_tag)
-df_brand_report['rating_tag_rank'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list,para.rating_tag_rank)
+df_brand_report['rating_tag'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list, para.rating_tag)
+df_brand_report['rating_tag_rank'] = common_util.get_cut(df_brand_report, 'rating', para.rating_list,
+                                                         para.rating_tag_rank)
 
-df_brand_report['ratings_tag'] = common_util.get_cut(df_brand_report, 'ratings', para.ratings_list,para.ratings_tag)
-df_brand_report['ratings_tag_rank'] = common_util.get_cut(df_brand_report, 'ratings',para.ratings_list, para.ratings_tag_rank)
+df_brand_report['ratings_tag'] = common_util.get_cut(df_brand_report, 'ratings', para.ratings_list, para.ratings_tag)
+df_brand_report['ratings_tag_rank'] = common_util.get_cut(df_brand_report, 'ratings', para.ratings_list,
+                                                          para.ratings_tag_rank)
 
 # B+等级产品占比
 df_brand_report_b = df_brand_report[df_brand_report['monthly_revenue'] >= 6000]
@@ -251,11 +240,91 @@ df_seller = df_seller[
      'asin_count_c', 'asin_revenue_c', 'asin_new_rate_90', 'asin_new_rate_180', 'revenue_fbm_rate', 'asin_b_rate',
      'revenue_b_rate', 'asin_c_rate', 'revenue_c_rate', 'seller_tag']]
 
+# ----------------------------------------------可跟卖链接推荐-----------------------------------------------------
+
+# 重量体积字段清洗
+profit_cal.weight_value_clean(df_seller_product)
+profit_cal.dimensions_value_clean(df_seller_product)
+profit_cal.dimensions_value_sort(df_seller_product, 'dimensions_value_cm_1', 'dimensions_value_cm_2',
+                                 'dimensions_value_cm_3')
+df_seller_product = df_seller_product[df_seller_product['weight(g)'].notnull()]
+
+# 规格数据转换
+df_seller_product[['max_length', 'mid_length', 'min_length', 'weight_pound', 'perimeter', 'weight_max_kg',
+                   'weight_max_pound', 'product_fee']] = df_seller_product.apply(lambda row: pd.Series(
+    profit_cal.value_convert_us(row['max_length_cm'], row['mid_length_cm'], row['min_length_cm'], row['weight(g)'],
+                                row['price'], para.exchange_rate_us)), axis=1)
+
+# 规格打标
+df_seller_product['size_tag'] = df_seller_product.apply(lambda row: pd.Series(
+    profit_cal.size_tag_us_cal(row['max_length'], row['mid_length'], row['min_length'], row['perimeter'],
+                               row['weight_max_pound'])), axis=1)
+
+# fba费用计算
+df_seller_product['fba_fee'] = df_seller_product.apply(
+    lambda row: profit_cal.fba_fee_us_cal(row['price'], row['size_tag'], row['weight_pound'], row['weight_max_pound']),
+    axis=1)
+
+df_seller_product['fba_fee_rate'] = df_seller_product['fba_fee'] / df_seller_product['price']
+
+# 开售月份计算
+month_available(df_seller_product)
+
+# 可跟卖产品筛选
+report_conditions = (df_seller_product['month_available'] > para.month_available_limit) & \
+                    (df_seller_product['price'] > para.price_limit_lower) & \
+                    (df_seller_product['price'] < para.price_limit_upper) & \
+                    (df_seller_product['weight(g)'] < para.weight_limit) & \
+                    (df_seller_product['ratings'] >= para.ratings_limit) & \
+                    (df_seller_product['rating'] >= para.rating_limit) & \
+                    (df_seller_product['fba_fee'] <= para.fba_fee_limit) & \
+                    (df_seller_product['fba_fee_rate'] <= para.fba_fee_rate_limit)
+df_seller_report = df_seller_product[report_conditions]
+
+# 可跟卖推荐得分
+df_seller_report['weight_score'] = common_util.get_cut(df_seller_report, 'weight(g)', para.follow_weight_list,
+                                                       para.follow_weight_label)
+df_seller_report['rating_score'] = common_util.get_cut(df_seller_report, 'rating', para.follow_rating_list,
+                                                       para.follow_rating_label)
+df_seller_report['ratings_score'] = common_util.get_cut(df_seller_report, 'ratings', para.follow_ratings_list,
+                                                        para.follow_ratings_label)
+df_seller_report['fba_fee_score'] = common_util.get_cut(df_seller_report, 'fba_fee', para.follow_fba_fee_list,
+                                                        para.follow_fba_fee_label)
+df_seller_report['fba_fee_rate_score'] = common_util.get_cut(df_seller_report, 'fba_fee_rate',
+                                                             para.follow_fba_fee_rate_list,
+                                                             para.follow_fba_fee_rate_label)
+
+df_seller_report['fbm_score'] = np.where((df_seller_report['seller_type'] == "FBM"), 2, 0)
+
+follow_tag_list = ['weight_score', 'rating_score', 'ratings_score', 'fba_fee_score', 'fba_fee_rate_score', 'fbm_score']
+for follow_tag in follow_tag_list:
+    # df_seller_report[follow_tag] = clean_util.convert_type(df_seller_report, follow_tag, 0)
+    df_seller_report[follow_tag] = pd.to_numeric(df_seller_report[follow_tag], errors='coerce').fillna(0)
+
+df_seller_report['follow_score'] = (
+        df_seller_report['weight_score'] * para.follow_weight_score +
+        df_seller_report['rating_score'] * para.follow_rating_score +
+        df_seller_report['ratings_score'] * para.follow_ratings_score +
+        df_seller_report['fba_fee_score'] * para.follow_fba_fee_score +
+        df_seller_report['fba_fee_rate_score'] * para.follow_fba_fee_rate_score +
+        df_seller_report['fbm_score'])
+
+df_follow_report = df_seller_report[
+    ['asin', 'task_tag', 'max_length_cm', 'mid_length_cm', 'min_length_cm', 'weight(g)', 'size_tag', 'fba_fee',
+     'fba_fee_rate', 'month_available', 'weight_score', 'rating_score', 'ratings_score', 'fba_fee_score',
+     'fba_fee_rate_score', 'fbm_score', 'follow_score']]
+
 # 数据入库
 sql_engine.data_to_sql(df_brand_report_tag, path.pt_brand_report_tag, 'append', config.connet_clue_shop_db_sql)
 sql_engine.data_to_sql(df_seller, path.pt_sellers_tag, 'append', config.connet_clue_shop_db_sql)
 
+sql_engine.data_to_sql(df_follow_report, path.pt_sellers_product_follow, 'append', config.connet_clue_shop_db_sql)
+
 # 状态更新
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
                            sql.update_brand_report_sql)
-"""
+
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_sql)
+
+print('done')

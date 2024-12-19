@@ -120,7 +120,7 @@ df_product['rating'] = data_cleaning_util.convert_type(df_product, 'rating', 1)
 
 product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'ac_keyword', 'weight', '二级类目']
 for con_l in product_con_list_3:
-    df_product[con_l] = data_cleaning_util.convert_str(df_product, con_l)
+    df_product[con_l] = data_cleaning_util.convert_str_lower(df_product, con_l)
 
 product_con_list_4 = ['date_available', 'sync_time', '数据更新时间']
 for con_u in product_con_list_4:
@@ -132,16 +132,16 @@ df_product['monthly_revenue_increase'] = df_product['sales_growth']
 data_cleaning_util.convert_type(df_product, 'monthly_revenue_increase', 4)
 
 # 辅助表
-data_cleaning_util.convert_str(df_famous_brand, 'brand')
+data_cleaning_util.convert_str_lower(df_famous_brand, 'brand')
 data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
-data_cleaning_util.convert_str(df_holiday, '节日关键词')
+data_cleaning_util.convert_str_lower(df_holiday, '节日关键词')
 
 # 3.M相关指标计算
 df_product_weight = df_product[df_product['weight'].notnull()]
 
 if not df_product_weight.empty:
     # 替换错误单位
-    for error_unit, replacement in para.replace_error_dict.items():
+    for error_unit, replacement in para.replace_weight_error_dict.items():
         df_product_weight['weight'] = df_product_weight['weight'].str.replace(error_unit, replacement, regex=False)
 
     # 一次性分割并创建新列
@@ -161,7 +161,7 @@ if not df_product_weight.empty:
     df_product_weight['重量值'] = np.where(df_product_weight['重量值判断'] == "-1", np.nan, df_product_weight['重量值'])
 
     # 计算换算值
-    df_product_weight['换算'] = df_product_weight['单位'].replace(para.replace_dict, regex=False)
+    df_product_weight['换算'] = df_product_weight['单位'].replace(para.replace_weight_dict, regex=False)
 
     # 计算重量
     df_product_weight['重量(g)'] = np.where(df_product_weight['重量值'].astype(float) * 1 > 0,

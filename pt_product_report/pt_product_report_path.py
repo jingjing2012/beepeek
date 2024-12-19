@@ -4,7 +4,7 @@
 pt_product_table = 'pt_product_report'
 pt_product_get_cpc = 'pt_product_get_cpc'
 pt_product_get_group = 'pt_product_get_group'
-pt_product_duplicate='pt_product_duplicate'
+pt_product_duplicate = 'pt_product_duplicate'
 
 pt_keywords = 'pt_keywords'
 cpc_from_keywords = 'cpc_from_keywords'
@@ -111,7 +111,7 @@ product_group_correction_sampling = 'product_group_correction_sampling'
 product_group_correction_pmi = 'product_group_correction_pmi'
 product_group_sampling_pmi = 'product_group_sampling_pmi'
 
-product_group_sampling_predict='product_group_sampling_predict'
+product_group_sampling_predict = 'product_group_sampling_predict'
 
 # 定位竞品提报
 # 数据库
@@ -136,3 +136,4 @@ pt_sellers_product = 'pt_sellers_product'
 
 pt_brand_report_tag = 'pt_brand_report_tag'
 pt_sellers_tag = 'pt_sellers_tag'
+pt_sellers_product_follow = 'pt_sellers_product_follow'

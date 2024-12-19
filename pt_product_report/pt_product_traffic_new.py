@@ -289,7 +289,7 @@ while row_start < row_max:
     if df_main_weight.empty:
         df_main_weight['重量(g)'] = np.nan
     else:
-        for error_unit, replacement in parameter.replace_error_dict.items():
+        for error_unit, replacement in parameter.replace_weight_error_dict.items():
             df_main_weight['weight'] = df_main_weight['weight'].astype(str).str.replace(error_unit, replacement,
                                                                                         regex=False)
 
@@ -308,7 +308,7 @@ while row_start < row_max:
 
         df_main_weight['单位'] = pd.Categorical(df_main_weight['单位'])
 
-        df_main_weight['换算'] = df_main_weight['单位'].replace(parameter.replace_dict, regex=False)
+        df_main_weight['换算'] = df_main_weight['单位'].replace(parameter.replace_weight_dict, regex=False)
 
         try:
             df_main_weight['换算'] = df_main_weight['换算'].astype('float64')

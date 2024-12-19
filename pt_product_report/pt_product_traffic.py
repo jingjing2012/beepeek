@@ -331,7 +331,7 @@ while row_start < row_max:
     convert_str(df_holiday, '节日关键词')
 
     # 3.M相关指标计算
-    for error_unit, replacement in parameter.replace_error_dict.items():
+    for error_unit, replacement in parameter.replace_weight_error_dict.items():
         df_traffic['weight'] = df_traffic['weight'].str.replace(error_unit, replacement)
 
     df_traffic['重量值'] = df_traffic['weight'].str.split(" ", expand=True)[0]
@@ -339,7 +339,7 @@ while row_start < row_max:
 
     df_traffic['单位'] = pd.Categorical(df_traffic['单位'])
 
-    df_traffic['换算'] = df_traffic['单位'].replace(parameter.replace_dict)
+    df_traffic['换算'] = df_traffic['单位'].replace(parameter.replace_weight_dict)
     try:
         df_traffic['换算'] = df_traffic['换算'].astype('float64')
     except ValueError as e:

@@ -244,76 +244,93 @@ recommend_bins = [-999, -1, 0, 1, 2, 999]
 recommend_labels = ['不推荐', '争议多', '待定', '小推荐', '推荐']
 
 # weight值清洗
-replace_error_dict = {'maximum weight: ': '',
-                      'minimum weight: ': '',
-                      'hundredths ': '',
-                      'pounds【460g】': 'pounds',
-                      'pounds, 500 pounds': '',
-                      'pounds 1.28千克': 'pounds',
-                      'manufacturer :': '',
-                      'ounces11': '',
-                      'ounces9': '',
-                      'yes': '',
-                      ',': '',
-                      ':': '',
-                      '@': '',
-                      '【': '',
-                      '】': '',
-                      '?': '',
-                      'ounces142': '',
-                      '磅': ' pounds',
-                      'lb': ' pounds',
-                      'lbs': ' pounds',
-                      'poundss': ' pounds',
-                      '盎司': ' ounces',
-                      'oz': ' ounces',
-                      '千克': ' kilograms',
-                      '公斤': ' kilograms',
-                      'kilo gramsrams gramsrams': ' kilograms',
-                      'kg': ' kilograms',
-                      'kilo': ' kilograms',
-                      '克': ' grams',
-                      'gramsrams': ' grams',
-                      'g': ' grams',
-                      '毫克': ' milligrams',
-                      'milli': ' milligrams',
-                      'item model number ': '',
-                      'department ': '',
-                      'unspsc code ': '',
-                      'heavy': '',
-                      'light': '',
-                      'li': '',
-                      'no': '',
-                      'mo': '',
-                      'ne': '',
-                      'tons': '',
-                      '300ft': '',
-                      '0/1wt': '',
-                      '\u200e': '',
-                      '-': ' ',
-                      'available in 3 break strengths': '',
-                      'fly fishing line': '',
-                      'fly ': '',
-                      'fish': '',
-                      'gramsht': '',
-                      'in': '',
-                      'available': '',
-                      'wei': ''}
+replace_weight_error_dict = {'maximum weight: ': '',
+                             'minimum weight: ': '',
+                             'hundredths ': '',
+                             'pounds【460g】': 'pounds',
+                             'pounds, 500 pounds': '',
+                             'pounds 1.28千克': 'pounds',
+                             'manufacturer :': '',
+                             'ounces11': '',
+                             'ounces9': '',
+                             'yes': '',
+                             ',': '',
+                             ':': '',
+                             '@': '',
+                             '【': '',
+                             '】': '',
+                             '?': '',
+                             'ounces142': '',
+                             '磅': ' pounds',
+                             'lb': ' pounds',
+                             'lbs': ' pounds',
+                             'poundss': ' pounds',
+                             '盎司': ' ounces',
+                             'oz': ' ounces',
+                             '千克': ' kg',
+                             '公斤': ' kg',
+                             'kilo gramsrams gramsrams': ' kg',
+                             'kilo gramsrams': ' kg',
+                             'kilograms': ' kg',
+                             'gramsrams': ' g',
+                             'gramsram': ' g',
+                             'kg': ' kg',
+                             'kilo': ' kg',
+                             '克': ' g',
+                             'g$': ' g',
+                             '毫克': ' mg',
+                             'milligrams': 'mg',
+                             'milligram': 'mg',
+                             'milli$': ' mg',
+                             'grams': ' g',
+                             'gram': ' g',
+                             'item model number ': '',
+                             'department ': '',
+                             'unspsc code ': '',
+                             'heavy': '',
+                             'light': '',
+                             'li': '',
+                             'no': '',
+                             'mo': '',
+                             'ne': '',
+                             'tons': '',
+                             '300ft': '',
+                             '0/1wt': '',
+                             '\u200e': '',
+                             '-': ' ',
+                             'available in 3 break strengths': '',
+                             'fly fishing line': '',
+                             'fly ': '',
+                             'fish': '',
+                             'gramsht': '',
+                             'in': '',
+                             'available': '',
+                             'wei': '',
+                             '  ': ' '}
 
-replace_weight_unit_list = ['pounds', 'pound', 'ounces', 'ounce', 'kilograms', 'kilogram', 'grams', 'gram',
-                            'milligrams', 'milligram']
+replace_weight_unit_list = ['pounds', 'pound', 'ounces', 'ounce', 'g', 'grams', 'kg', 'kilograms', 'mg', 'milligrams']
 
-replace_dict = {'pounds': '453.592',
-                'pound': '453.592',
-                'ounces': '28.3495',
-                'ounce': '28.3495',
-                'kilograms': '1000',
-                'kilogram': '1000',
-                'grams': '1',
-                'gram': '1',
-                'milligrams': '0.0001',
-                'milligram': '0.0001',
-                '': np.nan}
+replace_weight_dict = {'pounds': '453.592',
+                       'pound': '453.592',
+                       'ounces': '28.3495',
+                       'ounce': '28.3495',
+                       'kg': '1000',
+                       'kilograms': '1000',
+                       'g': '1',
+                       'grams': '1',
+                       'mg': '0.0001',
+                       'milligrams': '0.0001',
+                       '': np.nan}
+
+# dimensions值清洗
+replace_dimensions_error_dict = {'inches': '',
+                                 'inche': '',
+                                 '"d': '',
+                                 '"w ': '',
+                                 '"l ': '',
+                                 '"h ': '',
+                                 '"th ': '',
+                                 '  ': ''}
 
 # 一级类目清洗
 replace_category_dict = {'电器': 'appliances',
@@ -1006,3 +1023,35 @@ ounce_pound = 0.0625
 gram_pound = 0.00220462
 kilogram_pound = 2.20462
 pound_pound = 1
+inche_cm = 2.54
+
+# 可跟卖链接筛选条件
+month_available_limit = 12
+price_limit_lower = 9
+price_limit_upper = 199
+weight_limit = 2000
+ratings_limit = 5
+rating_limit = 3.9
+fba_fee_limit = 15
+fba_fee_rate_limit = 0.2
+
+# 可跟卖推荐性打分
+follow_weight_score = 0.2
+follow_weight_list = [1, 100, 300, 500, 1000, 2000]
+follow_weight_label = [5, 4, 3, 2, 1]
+
+follow_rating_score = 0.2
+follow_rating_list = [3.9, 4.2, 4.7, 5.5]
+follow_rating_label = [1, 2, 3]
+
+follow_ratings_score = 0.2
+follow_ratings_list = [5, 50, 100, 500, 1000, 9999]
+follow_ratings_label = [1, 2, 3, 4, 5]
+
+follow_fba_fee_score = 0.2
+follow_fba_fee_list = [0, 5, 10, 15]
+follow_fba_fee_label = [3, 2, 1]
+
+follow_fba_fee_rate_score = 0.2
+follow_fba_fee_rate_list = [0, 0.05, 0.1, 0.15, 2]
+follow_fba_fee_rate_label = [4, 3, 2, 1]

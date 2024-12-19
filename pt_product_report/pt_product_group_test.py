@@ -392,7 +392,7 @@ for page in range(total_pages):
 
     if not df_main_weight.empty:
         # 替换错误单位
-        for error_unit, replacement in para.replace_error_dict.items():
+        for error_unit, replacement in para.replace_weight_error_dict.items():
             df_main_weight['weight'] = df_main_weight['weight'].str.replace(error_unit, replacement, regex=False)
 
         # 一次性分割并创建新列
@@ -407,7 +407,7 @@ for page in range(total_pages):
         df_main_weight['重量值'] = np.where(df_main_weight['重量值判断'] == "-1", np.nan, df_main_weight['重量值'])
 
         # 计算换算值
-        df_main_weight['换算'] = df_main_weight['单位'].replace(para.replace_dict, regex=False)
+        df_main_weight['换算'] = df_main_weight['单位'].replace(para.replace_weight_dict, regex=False)
 
         # 计算重量
         df_main_weight['重量(g)'] = np.where(df_main_weight['重量值'].astype(float) * 1 > 0,

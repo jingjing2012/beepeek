@@ -164,7 +164,7 @@ while row_start < row_max:
 
     product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'ac_keyword', 'weight', '二级类目']
     for con_l in product_con_list_3:
-        data_cleaning_util.convert_str(df_product, con_l)
+        data_cleaning_util.convert_str_lower(df_product, con_l)
 
     # df_product['monthly_revenue_increase'] = pd.to_numeric(df_product['monthly_revenue_increase'].str.rstrip('%'),
     #                                                        errors='coerce') / 100
@@ -174,10 +174,10 @@ while row_start < row_max:
     data_cleaning_util.convert_date(df_product, 'date_available')
     data_cleaning_util.convert_date(df_product, 'sync_time')
 
-    data_cleaning_util.convert_str(df_famous_brand, 'brand')
+    data_cleaning_util.convert_str_lower(df_famous_brand, 'brand')
     data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
-    data_cleaning_util.convert_str(df_holiday, '节日关键词')
-    data_cleaning_util.convert_str(df_category_risk, 'category_path')
+    data_cleaning_util.convert_str_lower(df_holiday, '节日关键词')
+    data_cleaning_util.convert_str_lower(df_category_risk, 'category_path')
     data_cleaning_util.convert_type(df_category_risk, 'prohibited_risk', 0)
 
     # 3.M相关指标计算
@@ -185,7 +185,7 @@ while row_start < row_max:
 
     if not df_product_weight.empty:
         # 替换错误单位
-        for error_unit, replacement in para.replace_error_dict.items():
+        for error_unit, replacement in para.replace_weight_error_dict.items():
             df_product_weight['weight'] = df_product_weight['weight'].str.replace(error_unit, replacement, regex=False)
 
         # 一次性分割并创建新列
@@ -200,7 +200,7 @@ while row_start < row_max:
         df_product_weight['重量值'] = np.where(df_product_weight['重量值判断'] == "-1", np.nan, df_product_weight['重量值'])
 
         # 计算换算值
-        df_product_weight['换算'] = df_product_weight['单位'].replace(para.replace_dict, regex=False)
+        df_product_weight['换算'] = df_product_weight['单位'].replace(para.replace_weight_dict, regex=False)
 
         # 计算重量
         df_product_weight['重量(g)'] = np.where(df_product_weight['重量值'].astype(float) * 1 > 0,
