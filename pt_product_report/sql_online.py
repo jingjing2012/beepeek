@@ -1,16 +1,16 @@
-def extract_insert_statements(file_path):
+# 本地sql文件写入
+from conn import sql_engine, mysql_config as config
+
+
+def extract_insert_statements(file_path, target_table):
     with open(file_path, 'r', encoding='utf-8') as file, \
-            open("./report11.sql", 'a', encoding='utf-8') as output_file:
+            open(f"./{target_table}.sql", 'a', encoding='utf-8') as output_file:
         lines = []
         inside_insert = False
-        table_name = 'pt_product_report'
-
-        # table_name_list = ['pt_product_report', 'pt_product_get_cpc', 'pt_keywords', 'pt_product_report',
-        #                    'pt_product_report', 'pt_product_report', 'pt_product_report']
 
         for line in file:
             # 检查是否是插入特定表的语句
-            if line.strip().lower().startswith(f"insert into `{table_name}`") or inside_insert:
+            if line.strip().lower().startswith(f"insert into `{target_table}`") or inside_insert:
                 lines.append(line)
                 # 检查是否是插入语句的结束
                 if line.strip().endswith(';'):
@@ -28,4 +28,9 @@ def extract_insert_statements(file_path):
 
 if __name__ == '__main__':
     # 调用函数，传入SQL文件的路径
-    extract_insert_statements(r"\\192.168.10.244\数字化选品\OE数据\product_report_sql\sellersprite_202411.sql")
+    sellersprite_target_table_list = ['pt_keywords']
+    # sellersprite_target_table_list = ['pt_product_get_group','pt_relation_traffic', 'pt_relevance_asins']
+    sellersprite_file_path = r"\\192.168.10.244\数字化选品\OE数据\product_report_sql\sellersprite_202411.sql"
+
+    for sellersprite_target_table in sellersprite_target_table_list:
+        extract_insert_statements(sellersprite_file_path, sellersprite_target_table)

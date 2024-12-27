@@ -71,6 +71,9 @@ for j in report_list_2:
 
 clean_util.convert_str(df_brand_report, 'category')
 
+df_seller_product['task_asin'] = df_seller_product['asin'] + ' | ' + df_seller_product['task_tag']
+df_seller_product['buybox_seller_id'] = df_seller_product['buybox_seller'] + ' | ' + df_seller_product['task_tag']
+
 clean_util.convert_str_lower(df_seller_product, 'weight')
 clean_util.convert_str_lower(df_seller_product, 'dimensions')
 clean_util.convert_str(df_seller_product, 'seller_type')
@@ -294,7 +297,7 @@ df_seller_report['fba_fee_rate_score'] = common_util.get_cut(df_seller_report, '
                                                              para.follow_fba_fee_rate_list,
                                                              para.follow_fba_fee_rate_label)
 
-df_seller_report['fbm_score'] = np.where((df_seller_report['seller_type'] == "FBM"), 2, 0)
+df_seller_report['fbm_score'] = np.where((df_seller_report['seller_type'] == "FBM"), para.follow_fbm_score, 0)
 
 follow_tag_list = ['weight_score', 'rating_score', 'ratings_score', 'fba_fee_score', 'fba_fee_rate_score', 'fbm_score']
 for follow_tag in follow_tag_list:
@@ -310,9 +313,9 @@ df_seller_report['follow_score'] = (
         df_seller_report['fbm_score'])
 
 df_follow_report = df_seller_report[
-    ['asin', 'task_tag', 'max_length_cm', 'mid_length_cm', 'min_length_cm', 'weight(g)', 'size_tag', 'fba_fee',
-     'fba_fee_rate', 'month_available', 'weight_score', 'rating_score', 'ratings_score', 'fba_fee_score',
-     'fba_fee_rate_score', 'fbm_score', 'follow_score']]
+    ['asin', 'task_asin', 'buybox_seller_id', 'max_length_cm', 'mid_length_cm', 'min_length_cm', 'weight(g)',
+     'size_tag', 'fba_fee', 'fba_fee_rate', 'month_available', 'weight_score', 'rating_score', 'ratings_score',
+     'fba_fee_score', 'fba_fee_rate_score', 'fbm_score', 'follow_score']]
 
 # 数据入库
 sql_engine.data_to_sql(df_brand_report_tag, path.pt_brand_report_tag, 'append', config.connet_clue_shop_db_sql)

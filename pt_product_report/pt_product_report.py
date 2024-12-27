@@ -6,70 +6,10 @@ import pandas as pd
 from pandas.errors import SettingWithCopyWarning
 
 from conn import sql_engine, mysql_config as config
-from util import data_cleaning_util, calculation_util, common_util
+from util import data_cleaning_util, calculation_util, common_util, calculate_util, duplicate_util
 import pt_product_report_parameter as para
 import pt_product_report_path as path
 import pt_product_sql as sql
-
-
-# 直发FBM可能性
-def get_fbm(df):
-    df_fbm = df[df['buybox_location'].notnull()]
-    df_fbm['按毛利推测FBM可能性'] = np.where(df_fbm['gross_margin'] >= para.gross_margin_upper, 2, 1)
-    df_fbm['中国卖家FBM可能性'] = np.where(df_fbm['buybox_location'] == "CN", df_fbm['按毛利推测FBM可能性'], 0)
-
-    conditions_fbm_1 = (df_fbm['seller_type'] == "FBM") & (df_fbm['buybox_location'] != "US") & (
-            df_fbm['buybox_location'] != "") & (df_fbm['gross_margin'] >= para.gross_margin_lower)
-    conditions_fbm_2 = (df_fbm['fba_fees'] * 1 > 0) | (df_fbm['重量(g)'] <= 2500)
-    conditions_fbm_3 = (df_fbm['fba_fees'] <= para.fba_fees_upper) | (
-            df_fbm['gross_margin'] >= para.gross_margin_upper)
-    df_fbm['直发FBM可能性'] = np.where(conditions_fbm_1 & conditions_fbm_2 & conditions_fbm_3, 1 + df_fbm['中国卖家FBM可能性'], 0)
-    df_fbm = df_fbm[['id', '重量(g)', '直发FBM可能性']]
-    return df_fbm
-
-
-# 检查匹配关键词，计算总数并生成节日名字符串
-def match_holidays(row):
-    matched_holidays = [keyword for keyword in df_holiday['节日关键词'] if keyword in row['combined_kw']]
-    holidays_count = len(matched_holidays)
-    holidays_str = ", ".join(matched_holidays) if matched_holidays else ""
-    return holidays_count, holidays_str
-
-
-def match_custom_kw(row):
-    match_custom_kw = [keyword for keyword in custom_kw if keyword in row['title']]
-    custom_kw_count = len(match_custom_kw)
-    return custom_kw_count
-
-
-# 开售月数计算
-def month_available(df):
-    current_date = pd.to_datetime(datetime.now().date())
-    df['date_available'] = pd.to_datetime(df['date_available'], errors='coerce')
-    df['开售天数'] = (current_date - df['date_available']).dt.days
-    # df['date_available'] = np.where(df['开售天数'] * 1 > 0, df['date_available'], '1900-01-01')
-    df['头程月数'] = np.where((df['seller_type'] == "FBA") & (df['开售天数'] > 15), 0.5, 0)
-    df['开售月数'] = np.fmax(round(df['开售天数'] / 30 - df['头程月数'], 1), 0.1)
-    return df
-
-
-# 销额级数计算
-def get_revenue(df):
-    df['monthly_revenue_increase'] = df['monthly_revenue_increase'].fillna(0)
-    df['近两月销额'] = np.where(df['monthly_revenue_increase'] <= (-1), np.nan,
-                           df['monthly_revenue'] + (df['monthly_revenue'] / (1 + df['monthly_revenue_increase'])))
-    df['月均销额'] = np.where(df['近两月销额'] * 1 > 0, df['近两月销额'] / np.fmax(np.fmin(df['开售月数'] - 1, 1), 0.5), np.nan)
-    df['销额级数'] = np.fmax(1, np.log2(df['月均销额'] / 2 / (para.monthly_revenue_C / 2)))
-    return df
-
-
-def df_clear(df):
-    df.replace(to_replace=[None], value='', inplace=True)
-    df = df.replace([np.inf, -np.inf], np.nan)
-    df = df.drop_duplicates(subset=['ASIN'])
-    df = df.dropna(subset=['ASIN'])
-    return df
-
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -97,6 +37,10 @@ df_holiday = sql_engine.connect_pt_product(config.oe_hostname, config.oe_passwor
                                            sql.holiday_sql)
 df_category_risk = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
                                                  sql.category_risk_sql)
+df_seller_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
+                                               sql.seller_self_sql)
+df_brand_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
+                                              sql.brand_self_sql)
 
 # 线索数据去重
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
@@ -150,35 +94,35 @@ while row_start < row_max:
 
     # 2.数据预处理
     df_product['ASIN'] = df_product['asin']
-    df_product = df_clear(df_product)
+    df_product = duplicate_util.df_cleaning(df_product, 'ASIN')
     product_con_list_1 = ['category_bsr_growth', 'sales_growth', 'price', 'gross_margin', 'fba_fees']
     for con_i in product_con_list_1:
-        data_cleaning_util.convert_type(df_product, con_i, 2)
+        df_product[con_i] = data_cleaning_util.convert_type(df_product, con_i, 2)
 
     product_con_list_2 = ['sales', 'qa', 'ratings', 'variations']
     for con_j in product_con_list_2:
-        data_cleaning_util.convert_type(df_product, con_j, 0)
+        df_product[con_j] = data_cleaning_util.convert_type(df_product, con_j, 0)
 
-    data_cleaning_util.convert_type(df_product, 'reviews_rate', 4)
-    data_cleaning_util.convert_type(df_product, 'rating', 1)
+    df_product['reviews_rate'] = data_cleaning_util.convert_type(df_product, 'reviews_rate', 4)
+    df_product['rating'] = data_cleaning_util.convert_type(df_product, 'rating', 1)
 
     product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'ac_keyword', 'weight', '二级类目']
     for con_l in product_con_list_3:
-        data_cleaning_util.convert_str_lower(df_product, con_l)
+        df_product[con_l] = data_cleaning_util.convert_str_lower(df_product, con_l)
 
     # df_product['monthly_revenue_increase'] = pd.to_numeric(df_product['monthly_revenue_increase'].str.rstrip('%'),
     #                                                        errors='coerce') / 100
     df_product['monthly_revenue_increase'] = df_product['sales_growth']
-    data_cleaning_util.convert_type(df_product, 'monthly_revenue_increase', 4)
+    df_product['monthly_revenue_increase'] = data_cleaning_util.convert_type(df_product, 'monthly_revenue_increase', 4)
 
-    data_cleaning_util.convert_date(df_product, 'date_available')
-    data_cleaning_util.convert_date(df_product, 'sync_time')
+    df_product['date_available'] = data_cleaning_util.convert_date(df_product, 'date_available')
+    df_product['sync_time'] = data_cleaning_util.convert_date(df_product, 'sync_time')
 
-    data_cleaning_util.convert_str_lower(df_famous_brand, 'brand')
-    data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
-    data_cleaning_util.convert_str_lower(df_holiday, '节日关键词')
-    data_cleaning_util.convert_str_lower(df_category_risk, 'category_path')
-    data_cleaning_util.convert_type(df_category_risk, 'prohibited_risk', 0)
+    df_famous_brand['brand'] = data_cleaning_util.convert_str_lower(df_famous_brand, 'brand')
+    df_famous_brand['疑似知名品牌'] = data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
+    df_holiday['节日关键词'] = data_cleaning_util.convert_str_lower(df_holiday, '节日关键词')
+    df_category_risk['category_path'] = data_cleaning_util.convert_str_lower(df_category_risk, 'category_path')
+    df_category_risk['prohibited_risk'] = data_cleaning_util.convert_type(df_category_risk, 'prohibited_risk', 0)
 
     # 3.M相关指标计算
     df_product_weight = df_product[df_product['weight'].notnull()]
@@ -212,7 +156,7 @@ while row_start < row_max:
         df_product_weight['重量(g)'] = np.nan
 
     # 直发FBM可能性
-    df_product_fbm = get_fbm(df_product_weight)
+    df_product_fbm = calculate_util.get_fbm(df_product_weight)
 
     df_product = df_product.merge(df_product_fbm, how='left', on='id')
     df_product_fbm['直发FBM可能性'] = df_product_fbm['直发FBM可能性'].fillna(0)
@@ -223,7 +167,7 @@ while row_start < row_max:
                                     para.pre_fees_rate)
     df_product['预估货值占比'] = common_util.get_cut(df_product, 'price', [0, 6, 10, 15, 30, 50, 100, 200, 9999],
                                                [0.08, 0.1, 0.15, 0.2, 0.25, 0.27, 0.3, 0.35])
-    data_cleaning_util.convert_type(df_product, '预估货值占比', 2)
+    df_product['预估货值占比'] = data_cleaning_util.convert_type(df_product, '预估货值占比', 2)
 
     df_product['预估毛利率_FBM'] = df_product['gross_margin'] - df_product['预估头程占比'] * 2 - para.product_fees_rate
     df_product['预估毛利率_FBA'] = df_product['gross_margin'] - df_product['预估头程占比'] - para.product_fees_rate
@@ -250,10 +194,10 @@ while row_start < row_max:
 
     # I相关指标
     # 开售月数
-    month_available(df_product)
+    calculate_util.month_available(df_product)
 
     # S相关指标
-    get_revenue(df_product)
+    calculate_util.get_revenue(df_product)
 
     conditions_lqs_1 = (df_product['预估毛利率'] >= -0.05) & (df_product['lqs'] * 1 > 0) & (df_product['lqs'] <= 8)
     conditions_lqs_2 = (df_product['开售月数'] >= 24) & (df_product['rating'] >= 4) & (df_product['ratings'] >= 10) & (
@@ -288,7 +232,8 @@ while row_start < row_max:
 
     df_product['combined_kw'] = df_product['title'] + "" + df_product['sub_category'] + "" + df_product['ac_keyword']
 
-    df_product[['疑似节日性', '节日名']] = df_product.apply(lambda row: pd.Series(match_holidays(row)), axis=1)
+    df_product[['疑似节日性', '节日名']] = df_product.apply(
+        lambda row: pd.Series(calculate_util.match_holidays(row, df_holiday['节日关键词'])), axis=1)
 
     df_product['知名品牌'] = np.where(df_product['疑似知名品牌'] * 1 > 0,
                                   -df_product['疑似知名品牌'] / np.where(df_product['疑似节日性'] * 1 > 0, 2, 1),
@@ -300,7 +245,8 @@ while row_start < row_max:
     # 是否个人定制
     custom_kw = ['custom', 'personalize', 'personalized', 'custom-made', 'customized', 'made-to-order']
     # custom = [kw for kw in custom_kw if kw in df_product['title']]
-    df_product['custom_kw'] = df_product.apply(lambda row: pd.Series(match_custom_kw(row)), axis=1)
+    df_product['custom_kw'] = df_product.apply(lambda row: pd.Series(calculate_util.match_custom_kw(row, custom_kw)),
+                                               axis=1)
     df_product['是否个人定制'] = np.where(df_product['custom_kw'] * 1 > 0, 1, 0)
 
     # 是否翻新
@@ -345,14 +291,14 @@ while row_start < row_max:
     recommend_weights = recommend_weights.astype(float)
 
     df_recommend['推荐度'] = df_recommend.dot(recommend_weights)
-    data_cleaning_util.convert_type(df_recommend, '推荐度', 1)
+    df_recommend['推荐度'] = data_cleaning_util.convert_type(df_recommend, '推荐度', 1)
 
     df_recommend = df_recommend[['id', '推荐度']]
     df_product = df_product.merge(df_recommend, how='left', on='id')
 
     # 数据更新日期
     df_product['数据更新时间'] = update_date
-    data_cleaning_util.convert_date(df_product, '数据更新时间')
+    df_product['数据更新时间'] = data_cleaning_util.convert_date(df_product, '数据更新时间')
 
     # 一级类目清洗
     df_product['category'] = df_product['category'].replace(para.replace_category_dict)
@@ -365,15 +311,26 @@ while row_start < row_max:
         df_product['category_path'].str.contains(para.regex_pattern_kw, na=False, regex=True), '剔除类目'] = 1
     df_product['剔除类目'] = np.where(df_product['剔除类目'] == 1, 1, 0)
 
+    # 按类目风险剔除
     df_product = df_product.merge(df_category_risk, how='left', on='category_path')
     df_product['prohibited_risk'] = df_product['prohibited_risk'].fillna(0)
     df_product = df_product[df_product['prohibited_risk'] <= 7]
+
+    # 排除公司内店铺
+    df_product = df_product.merge(df_seller_self, how='left', on='buybox_seller')
+    df_product['seller_status'] = df_product['seller_status'].fillna(0)
+    df_product = df_product[df_product['seller_status'] < 1]
+
+    # 排除公司内品牌
+    df_product = df_product.merge(df_seller_self, how='left', on='brand')
+    df_product['brand_status'] = df_product['brand_status'].fillna(0)
+    df_product = df_product[df_product['brand_status'] < 1]
 
     # 数据格式整理
     product_con_list = ['预估FBA占比', '预估头程占比', '预估毛利率', '毛估资金利用率', '销额级数', '高资金利用率', '高销低LQS', '类轻小直发FBM', '平均变体月销额等级',
                         '新品爬坡快']
     for con_k in product_con_list:
-        data_cleaning_util.convert_type(df_product, con_k, 4)
+        df_product[con_k] = data_cleaning_util.convert_type(df_product, con_k, 4)
 
     # 5.添加数据标签
     df_product_tag = df_product[
@@ -482,7 +439,7 @@ while row_start < row_max:
                                    '剔除类目',
                                    '数据更新时间']]
 
-    df_product_table = df_clear(df_product_table)
+    df_product_table = duplicate_util.df_cleaning(df_product_table, 'ASIN')
 
     df_product_table.rename(columns={'sku': 'SKU',
                                      'brand': '品牌',
@@ -525,7 +482,7 @@ while row_start < row_max:
                                      'sync_time': '最近更新'}, inplace=True)
 
     df_product_recommend_modify = df_product_tag[['ASIN', '销额级数', '推荐度', '推荐度分布', '销额级数分布', '数据更新时间']]
-    df_product_recommend_modify = df_clear(df_product_recommend_modify)
+    df_product_recommend_modify = duplicate_util.df_cleaning(df_product_recommend_modify, 'ASIN')
 
     df_product_tag = df_product_tag[
         ['ASIN', '价格分布', 'category', 'seller_type', '直发FBM可能性', '预估FBA占比分布', '预估毛利率分布', '毛估资金利用率分布', '开售月数分布',
@@ -533,7 +490,7 @@ while row_start < row_max:
          'rating', '知名品牌', 'variations', '评分数分布', 'new_release', 'ac', '少评好卖分布', '是否个人定制', '是否翻新', '剔除类目', '数据更新时间',
          'data_id']]
 
-    df_product_tag = df_clear(df_product_tag)
+    df_product_tag = duplicate_util.df_cleaning(df_product_tag, 'ASIN')
 
     df_product_tag.rename(columns={'category': '一级类目',
                                    'seller_type': '配送方式分布',
@@ -548,7 +505,7 @@ while row_start < row_max:
                                    'ac': 'Amazon s Choice'}, inplace=True)
 
     df_product_cpc = df_product_cpc[['ASIN', 'price', '推荐度']]
-    df_product_cpc = df_clear(df_product_cpc)
+    df_product_cpc = duplicate_util.df_cleaning(df_product_cpc, 'ASIN')
 
     df_product_cpc.rename(columns={'ASIN': 'asin', '推荐度': 'recommend'}, inplace=True)
 

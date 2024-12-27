@@ -24,8 +24,8 @@ df_group = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password,
 pd.set_option('display.max_columns', None)
 
 # 数据清洗
-df_group = df_group.drop(df_group.columns[0:10], axis=1)
-df_group = df_group.drop(df_group.columns[36:52], axis=1)
+df_group = df_group.drop(df_group.columns[0:2], axis=1)
+df_group = df_group.drop(df_group.columns[43:62], axis=1)
 # df_group = df_group.drop('ratings_revenue_pass', axis=1)
 df_group = df_group.drop('冒出品低星款数', axis=1)
 print(df_group.shape)
@@ -46,7 +46,7 @@ plt.rcParams['axes.unicode_minus'] = False
 features = list(df_group[1:44])
 corr = df_group[features].corr()
 plt.figure(figsize=(50, 50))
-sns.heatmap(corr, annot=True, fmt='.2f', linecolor='gray', cmap='coolwarm')
+# sns.heatmap(corr, annot=True, fmt='.2f', linecolor='gray', cmap='coolwarm')
 plt.show()
 """
 
@@ -148,7 +148,7 @@ def GridSearchCV_work(pipeline, train_x, train_y, test_x, test_y, param_grid, sc
     print('GridSeatchCV最优分数： %.4lf' % search.best_score_)
     predict_y = search.predict(test_x)
     # print(predict_y)
-    print('\n')
+    # print('\n')
     print('准确率 %.4lf' % accuracy_score(test_y, predict_y))
     print("精确率: %.4lf" % precision_score(test_y, predict_y, zero_division=0))
     print("召回率: %.4lf" % recall_score(test_y, predict_y))
@@ -211,7 +211,7 @@ def GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x
     reponse['best_estimators'] = search.best_estimator_
     predict_y = search.predict(test_x)
     # print(predict_y)
-    print('\n')
+    # print('\n')
     reponse['accuracy_score'] = accuracy_score(test_y, predict_y)
     reponse['precision_score'] = precision_score(test_y, predict_y, zero_division=0)
     reponse['recall_score'] = recall_score(test_y, predict_y)
@@ -248,11 +248,23 @@ models = {
 }
 
 param_grids = {
-    'svc': {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.1, 1]},
-    'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
-    'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 100, 200],
-                               'randomforestclassifier__max_depth': [3, 5, 10, 15]},
-    'kneighborsclassifier': {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]},
+    'svc': {'svc__C': [0.01, 0.1, 1, 10, 100, 1000],  # 正则化参数：控制过拟合与欠拟合的平衡
+            'svc__gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10],  # 核函数系数：定义 RBF、poly 等核函数的影响范围
+            'svc__kernel': ['linear', 'poly', 'rbf', 'sigmoid']},  # 核函数类型：选择不同的核方法
+    'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [None, 3, 5, 10, 20, 50],  # 树的最大深度：防止树过度生长
+                               'decisiontreeclassifier__min_samples_split': [2, 5, 10, 20],  # 节点分裂所需的最小样本数
+                               'decisiontreeclassifier__min_samples_leaf': [1, 2, 5, 10],  # 叶子节点最小样本数
+                               'decisiontreeclassifier__criterion': ['gini', 'entropy', 'log_loss']},  # 分裂标准
+    'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 100, 200, 500],  # 森林中的树木数量：影响模型性能与训练时间
+                               'randomforestclassifier__max_depth': [None, 5, 10, 20, 50],  # 树的最大深度：控制单棵树的复杂度
+                               'randomforestclassifier__min_samples_split': [2, 5, 10],  # 节点分裂所需的最小样本数
+                               'randomforestclassifier__min_samples_leaf': [1, 2, 5],  # 叶子节点最小样本数
+                               'randomforestclassifier__max_features': ['sqrt', 'log2', None, 0.5],  # 每次分裂时的特征数量
+                               'randomforestclassifier__bootstrap': [True, False]},  # 是否使用自助采样法
+    'kneighborsclassifier': {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9, 15, 20],  # 邻居数：控制预测的平滑性
+                             'kneighborsclassifier__weights': ['uniform', 'distance'],  # 权重函数：定义邻居的权重
+                             'kneighborsclassifier__metric': ['euclidean', 'manhattan', 'minkowski'],  # 距离度量方式
+                             'kneighborsclassifier__p': [1, 2]},  # 距离的幂参数
     # 'gradientboostingclassifier': {'gradientboostingclassifier__n_estimators': [50, 100, 200],
     #                                'gradientboostingclassifier__learning_rate': [0.01, 0.1, 0.2],
     #                                'gradientboostingclassifier__max_depth': [3, 5, 7],

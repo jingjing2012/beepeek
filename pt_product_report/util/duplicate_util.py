@@ -7,6 +7,7 @@ import numpy as np
 
 # df去重
 def df_cleaning(df, clear_id):
+    df = df.replace(to_replace=[None], value='')
     df = df.replace('none', np.nan, regex=False)
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.drop_duplicates(subset=[clear_id])

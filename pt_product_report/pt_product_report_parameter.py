@@ -1026,32 +1026,34 @@ pound_pound = 1
 inche_cm = 2.54
 
 # 可跟卖链接筛选条件
-month_available_limit = 12
-price_limit_lower = 9
-price_limit_upper = 199
-weight_limit = 2000
-ratings_limit = 5
-rating_limit = 3.9
-fba_fee_limit = 15
-fba_fee_rate_limit = 0.2
+month_available_limit = 12  # 开售月份>12
+price_limit_lower = 9  # 价格>9
+price_limit_upper = 199  # 价格<199
+weight_limit = 2000  # 重量<2kg
+ratings_limit = 5  # 星数>=5
+rating_limit = 3.9  # 星级>=3.9
+fba_fee_limit = 15  # FBA费用<=15
+fba_fee_rate_limit = 0.2  # FBA费用占比<=0.2
 
 # 可跟卖推荐性打分
-follow_weight_score = 0.2
-follow_weight_list = [1, 100, 300, 500, 1000, 2000]
-follow_weight_label = [5, 4, 3, 2, 1]
+follow_weight_score = 0.2  # 重量得分权重
+follow_weight_list = [1, 100, 300, 500, 1000, 2000]  # 重量分值划分区间
+follow_weight_label = [5, 4, 3, 2, 1]  # 重量得分区间
 
-follow_rating_score = 0.2
-follow_rating_list = [3.9, 4.2, 4.7, 5.5]
-follow_rating_label = [1, 2, 3]
+follow_rating_score = 0.2  # 评分得分权重
+follow_rating_list = [3.9, 4.2, 4.7, 5.5]  # 评分分值划分区间
+follow_rating_label = [1, 2, 3]  # 评分得分区间
 
-follow_ratings_score = 0.2
-follow_ratings_list = [5, 50, 100, 500, 1000, 9999]
-follow_ratings_label = [1, 2, 3, 4, 5]
+follow_ratings_score = 0.2  # 评分数得分权重
+follow_ratings_list = [5, 50, 100, 500, 1000, 9999]  # 评分数分值划分区间
+follow_ratings_label = [1, 2, 3, 4, 5]  # 评分数得分区间
 
-follow_fba_fee_score = 0.2
-follow_fba_fee_list = [0, 5, 10, 15]
-follow_fba_fee_label = [3, 2, 1]
+follow_fba_fee_score = 0.2  # FBA费用得分权重
+follow_fba_fee_list = [0, 5, 10, 15]  # FBA费用分值划分区间
+follow_fba_fee_label = [3, 2, 1]  # FBA费用得分区间
 
-follow_fba_fee_rate_score = 0.2
-follow_fba_fee_rate_list = [0, 0.05, 0.1, 0.15, 2]
-follow_fba_fee_rate_label = [4, 3, 2, 1]
+follow_fba_fee_rate_score = 0.2  # FBA费用占比得分权重
+follow_fba_fee_rate_list = [0, 0.05, 0.1, 0.15, 2]  # FBA费用占比分值划分区间
+follow_fba_fee_rate_label = [4, 3, 2, 1]  # FBA费用占比得分区间
+
+follow_fbm_score = 0.5  # FBM配送方式加分

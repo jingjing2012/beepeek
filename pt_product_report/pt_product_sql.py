@@ -6,6 +6,8 @@ from conn import mysql_config as config
 holiday_sql = 'select 节日关键词 from ' + path.product_database + '.' + path.product_holiday
 famous_brand_sql = 'select brand,预估影响力 as "疑似知名品牌" from ' + path.product_database + '.' + path.product_famous_brand
 category_risk_sql = 'select category_path,prohibited_risk from ' + path.product_database + '.' + path.product_category_risk
+seller_self_sql = 'select buybox_seller,seller_status from ' + path.product_database + '.' + path.seller_self
+brand_self_sql = 'select brand,brand_status from ' + path.product_database + '.' + path.brand_self
 
 # cpc表
 clear_sql_product_cpc = "TRUNCATE TABLE " + path.product_cpc
@@ -542,10 +544,10 @@ sql_clue_sampling_history = 'select * from product_clue_sampling'
 sql_clue_sbi_history = 'select * from product_clue_sbi'
 sql_clue_fbm_history = 'select * from product_clue_fbm'
 
-sampling_knn_sql = 'SELECT product_group_self.*,IF(product_clue_sampling.clue_tag="运营有效",1,0) "clue_tag" FROM ' \
-                   'product_clue_sampling LEFT JOIN product_group_self ON ' \
-                   'product_clue_sampling.clue_asin=product_group_self.`原ASIN` WHERE product_clue_sampling.`status`=2 AND ' \
-                   'product_group_self.`有销额竞品款数`>=5'
+sampling_knn_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_sampling + '.clue_tag="运营有效",1,0) "clue_tag"' + \
+                   ' FROM ' + path.product_clue_sampling + ' LEFT JOIN product_group_self ON ' \
+                   + path.product_clue_sampling + '.clue_asin=product_group_self.`原ASIN` ' + \
+                   'WHERE ' + path.product_clue_sampling + '.`status`=2 AND product_group_self.`有销额竞品款数`>=5'
 
 sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`="2024-07-01" AND `有销额竞品款数`>=5 AND `重复利基`=0'
 
@@ -580,6 +582,7 @@ sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE b
 sql_seller_product = """
 SELECT DISTINCT
 	asin,
+	buybox_seller,
 	price,
 	rating,
 	ratings,
@@ -636,4 +639,4 @@ update_brand_report_sql = 'UPDATE ' + path.pt_brand_competing_report + \
                           ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
 
 update_seller_product_sql = 'UPDATE ' + path.pt_sellers_product + \
-                          ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
+                            ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'

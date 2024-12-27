@@ -19,6 +19,8 @@ pt_relevance_asins_old = 'pt_relevance_asins_old'
 product_famous_brand = 'brand'
 product_holiday = 'holiday'
 product_category_risk = 'category_risk'
+seller_self = 'seller_self'
+brand_self = 'brand_self'
 
 # 目标数据库
 product_database = 'product_report'
