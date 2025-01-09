@@ -9,7 +9,6 @@ from util import data_cleaning_util, calculation_util, calculate_util, duplicate
 import pt_product_report_path as path
 import pt_product_report_parameter as parameter
 import pt_product_sql as sql
-import kmeans_tag
 
 # 忽略与 Pandas SettingWithCopyWarning 模块相关的警告
 warnings.filterwarnings('ignore', category=SettingWithCopyWarning)
@@ -41,8 +40,8 @@ id_end = 2000000
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
 # cpc数据写入
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                           sql.insert_sql_cpc_from_keywords)
+# sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+#                            sql.insert_sql_cpc_from_keywords)
 
 while id_start < id_end:
     # 1.数据连接
@@ -207,107 +206,11 @@ while id_start < id_end:
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.update_sql_sub_category)
 
-df_clue_self = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                             config.clue_self_database, sql.sql_clue_self)
-
-df_group = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                         config.sellersprite_database, sql.sql_group)
-
-# 对价格进行打标
-df_price = df_group[['sub_category', 'price']]
-df_price_st = kmeans_tag.tag_st(df_price, 'sub_category', 'price')
-
-df_price_list = df_price_st['price'].groupby(df_price_st['sub_category']).apply(
-    lambda x: kmeans_tag.tag_k_means(x)).reset_index()
-df_price_list.columns = ['sub_category', 'price_list']
-
-df_price_tag_list = df_price.merge(df_price_list)
-df_price_tag_list['price_tag_rank'] = df_price_tag_list.apply(
-    lambda row: pd.Series(kmeans_tag.tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
-
-# 对FBA费用进行打标
-df_fba_fees = df_group[['sub_category', 'fba_fees']]
-df_fba_fees_st = kmeans_tag.tag_st(df_fba_fees, 'sub_category', 'fba_fees')
-
-df_fba_fees_list = df_fba_fees_st['fba_fees'].groupby(df_fba_fees_st['sub_category']).apply(
-    lambda x: kmeans_tag.tag_k_means(x)).reset_index()
-df_fba_fees_list.columns = ['sub_category', 'fba_fees_list']
-
-df_fba_fees_tag_list = df_fba_fees.merge(df_fba_fees_list)
-df_fba_fees_tag_list['fba_fees_tag_rank'] = df_fba_fees_tag_list.apply(
-    lambda row: pd.Series(kmeans_tag.tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(
-    drop=True)
-
-# 重复度计算
-df_tag = df_group.merge(df_price_tag_list, how='left', on=['sub_category', 'price'])
-df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
-
-df_tag = df_tag.merge(df_fba_fees_tag_list, how='left', on=['sub_category', 'fba_fees'])
-df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
-
-df_tag['rank'] = df_tag.groupby(['sub_category', 'price_tag_rank', 'fba_fees_tag_rank'])['blue_ocean_estimate'].rank(
-    ascending=False, method='dense').reset_index(drop=True)
-df_tag['rank'] = df_tag['rank'].round(0)
-
-# 将 NaN 替换为 None（MySQL 中的 NULL）
-df_tag = df_tag.fillna(value={
-    'price_list': '[]',  # 将 NaN 替换为空列表的字符串
-    'price_tag_rank': 1,  # 替换为默认值 1
-    'fba_fees_list': '[]',  # 将 NaN 替换为空列表的字符串
-    'fba_fees_tag_rank': 1,  # 替换为默认值 1
-    'rank': 1  # 替换为默认值 1
-})
-
-df_tag['duplicate_tag'] = np.where(df_tag['rank'] <= 10, df_tag['rank'], '10+')
-
-duplicate_tag_conditions = (df_tag['sub_category'].str.len() >= 1) & ((df_tag['price_list'].str.len() >= 1) | (
-        df_tag['fba_fees_list'].str.len() >= 1))
-
-df_tag['duplicate_tag'] = np.where(duplicate_tag_conditions, df_tag['duplicate_tag'], '0')
-
-# 重复类型打标
-df_clue_price_tag_list = df_clue_self.merge(df_price_list, on='sub_category').merge(df_fba_fees_list, on='sub_category')
-
-df_clue_price_tag_list['price_tag_rank'] = df_clue_price_tag_list.apply(
-    lambda row: pd.Series(kmeans_tag.tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
-
-df_clue_price_tag_list['fba_fees_tag_rank'] = df_clue_price_tag_list.apply(
-    lambda row: pd.Series(kmeans_tag.tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(
-    drop=True)
-
-tag_kmeans_list = ['price_list', 'fba_fees_list']
-for tag_kmeans in tag_kmeans_list:
-    data_cleaning_util.convert_str(df_tag, tag_kmeans)
-    data_cleaning_util.convert_str(df_clue_price_tag_list, tag_kmeans)
-
-df_tag = df_tag.merge(df_clue_price_tag_list, how='left',
-                      on=['sub_category', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank'])
-
-df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "0", 0, df_tag['duplicate_type'])
-df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "10+", 1, df_tag['duplicate_type'])
-
-df_duplicate = df_tag[
-    ['asin', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank', 'rank', 'duplicate_tag',
-     'duplicate_type']]
-
-tag_list = ['price_tag_rank', 'fba_fees_tag_rank', 'rank', 'duplicate_type']
-for tag in tag_list:
-    data_cleaning_util.convert_type(df_duplicate, tag, 0)
-
-# 将 NaN 替换为 None（MySQL 中的 NULL）
-df_duplicate = df_duplicate.fillna(value={
-    'duplicate_tag': 1,
-    'duplicate_type': 0
-})
-
-df_duplicate = duplicate_util.df_cleaning(df_duplicate, 'asin')
-
-print('well')
-
-sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', config.connet_sellersprite_db_sql)
-
-sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', config.connet_product_db_sql)
-
-print('done')
-
+"""
+# 关联流量历史数据复用
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+                           sql.insert_sql_pt_relevance_asins_old)
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+                           sql.insert_sql_pt_relation_traffic_old)
+"""
 print("用时：" + (time.time() - start_time).__str__())

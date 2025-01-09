@@ -16,6 +16,9 @@ supplement_competitors = 'supplement_competitors'
 pt_relation_traffic_old = 'pt_relation_traffic_old'
 pt_relevance_asins_old = 'pt_relevance_asins_old'
 
+pt_relation_traffic_older = 'pt_relation_traffic_older'
+pt_relevance_asins_older = 'pt_relevance_asins_older'
+
 product_famous_brand = 'brand'
 product_holiday = 'holiday'
 product_category_risk = 'category_risk'
@@ -93,7 +96,8 @@ product_traffic_tag_self = 'product_traffic_tag_self'
 # 线索检验
 # 数据源库
 clue_sampling = 'clue_sampling'
-product_clue_sampling = 'product_clue_sampling'
+# product_clue_sampling = 'product_clue_sampling'
+product_clue_sampling = 'product_clue_sampling_fbm'
 product_clue_sbi = 'product_clue_sbi'
 product_clue_fbm = 'product_clue_fbm'
 # 目标数据
@@ -139,3 +143,5 @@ pt_sellers_product = 'pt_sellers_product'
 pt_brand_report_tag = 'pt_brand_report_tag'
 pt_sellers_tag = 'pt_sellers_tag'
 pt_sellers_product_follow = 'pt_sellers_product_follow'
+
+seller_product_follow = 'seller_product_follow'

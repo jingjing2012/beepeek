@@ -283,7 +283,8 @@ CREATE TABLE `pt_relation_traffic_old` (
 
 # 写入表
 insert_sql_pt_relevance_asins_old = \
-    "INSERT INTO sellersprite_202411.`pt_relevance_asins_old` " + \
+    "INSERT INTO " \
+    + config.sellersprite_database + ".`" + path.pt_relevance_asins_old + "` " + \
     "( `relation_traffic_id`, `product_report_id`, `asin`, `category_relevance`, `relevance` ) (" + \
     "SELECT distinct " \
     "pt_relevance_asins.`relation_traffic_id`," \
@@ -298,7 +299,8 @@ insert_sql_pt_relevance_asins_old = \
     + config.sellersprite_database_old + ".pt_relevance_asins.asin);"
 
 insert_sql_pt_relation_traffic_old = \
-    'INSERT INTO `pt_relation_traffic_old` (' + \
+    'INSERT INTO ' \
+    + config.sellersprite_database + '.`' + path.pt_relation_traffic_old + '` (' + \
     '`id`,' + \
     '`asin`,' + \
     '`related_asin_num`,' + \
@@ -411,11 +413,11 @@ duplicate_sql2_old = 'UPDATE product_group_history SET `重复利基`=0 WHERE `�
 # 父体去重
 duplicate_sql3 = 'UPDATE product_group_history SET `重复利基`=2 WHERE `数据更新时间`="' + str(update_date) + \
                  '" AND `重复利基`=0 AND `原ASIN` IN(SELECT `原ASIN` FROM (SELECT product_group_history.`原ASIN`,' \
-                 'ROW_NUMBER() OVER (PARTITION BY product_report_history.`父体`,product_group_history.`代表节点` ' \
-                 'ORDER BY `PMI得分` DESC) "pmi_rank" FROM product_group_history LEFT JOIN product_report_history ' \
-                 'ON product_group_history.`原ASIN`=product_report_history.ASIN AND product_group_history.`数据更新时间` ' \
+                 'ROW_NUMBER() OVER (PARTITION BY product_report_history.`父体`,product_group_history.`代表节点` ' + \
+                 'ORDER BY `PMI得分` DESC) "pmi_rank" FROM product_group_history LEFT JOIN product_report_history ' + \
+                 'ON product_group_history.`原ASIN`=product_report_history.ASIN AND product_group_history.`数据更新时间` ' + \
                  '=product_report_history.`数据更新时间` WHERE product_group_history.`数据更新时间`="' + str(update_date) + \
-                 '" AND product_group_history.`有销额竞品款数`>=10) group_duplicate WHERE pmi_rank>2)'
+                 '" AND product_group_history.`有销额竞品款数`>=10) group_duplicate WHERE pmi_rank>=2)'
 
 # 历史开售产品去重
 duplicate_sql4 = 'UPDATE product_group_history SET `重复利基`=3 WHERE `数据更新时间`="' + str(update_date) + \
@@ -490,8 +492,8 @@ update_sql_product_tag_sampling = "UPDATE product_tag_sampling INNER JOIN produc
 update_clue_cpc_sql = 'UPDATE pt_product_get_cpc SET `status`=2 WHERE asin IN(SELECT asin FROM pt_product_get_group)'
 
 sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where status=1'
-# sql_asin = 'select * from ' + path.pt_product_get_cpc
-# sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where update_time="2024-08-16"'
+# sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where id>=323394'
+# sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where update_time>="2024-09-01"'
 sql_kw = 'select ' + path.pt_keywords + '.*,pt_product.price,pt_product.recommend,pt_product.update_time as ' + \
          '"数据更新时间" from (' + sql_asin + ') pt_product left join ' + path.pt_keywords + ' on pt_product.asin = ' + \
          path.pt_keywords + '.asin'
@@ -543,6 +545,8 @@ sql_clue_self_history = 'select * from product_clue_self'
 sql_clue_sampling_history = 'select * from product_clue_sampling'
 sql_clue_sbi_history = 'select * from product_clue_sbi'
 sql_clue_fbm_history = 'select * from product_clue_fbm'
+
+sql_shop_follow_history = 'select * from seller_product_follow'
 
 sampling_knn_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_sampling + '.clue_tag="运营有效",1,0) "clue_tag"' + \
                    ' FROM ' + path.product_clue_sampling + ' LEFT JOIN product_group_self ON ' \
@@ -640,3 +644,15 @@ update_brand_report_sql = 'UPDATE ' + path.pt_brand_competing_report + \
 
 update_seller_product_sql = 'UPDATE ' + path.pt_sellers_product + \
                             ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
+
+sql_shop_follow = """
+SELECT DISTINCT
+	pt_sellers_product.asin,
+	pt_sellers_product.title,
+	pt_sellers_product.image 
+FROM
+	pt_sellers_product_follow
+	INNER JOIN pt_sellers_product ON pt_sellers_product_follow.asin = pt_sellers_product.asin 
+WHERE
+	pt_sellers_product_follow.sale_status =0 AND `status`=1
+"""

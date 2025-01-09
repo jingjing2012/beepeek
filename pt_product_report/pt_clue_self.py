@@ -57,6 +57,9 @@ df_product_fbm2 = data_read(data_path.pt_product_table_fbm, data_path.sheet_fbm2
 
 df_shop_self = data_read(data_path.pt_shop_table_self, data_path.sheet_shop)
 
+df_shop_follow = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                               config.clue_shop_database, sql.sql_shop_follow)
+
 # 数据处理
 df_product_self = df_product_self[['ASIN', '提报人员', '提报日期', '批次Tag']]
 df_product_self.rename(columns={'ASIN': 'asin',
@@ -121,10 +124,15 @@ df_clue_sbi_history = sql_engine.connect_pt_product(config.oe_hostname, config.o
 df_clue_fbm_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                                     sql.sql_clue_fbm_history)
 
+df_shop_follow_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                                       sql.sql_shop_follow_history)
+
 df_clue_self = data_duplicate(df_product_self, df_clue_self_history)
 df_clue_sampling = data_duplicate(df_product_sampling, df_clue_sampling_history)
 df_clue_sbi = data_duplicate(df_product_sbi, df_clue_sbi_history)
 df_clue_fbm = data_duplicate(df_product_fbm, df_clue_fbm_history)
+
+df_shop_follow_ai = data_duplicate(df_shop_follow, df_shop_follow_history)
 
 # 数据整合
 df_clue_self_pt = df_product_self_pt[['asin', 'update_time']]
@@ -156,3 +164,5 @@ sql_engine.data_to_sql(df_clue_position, data_path.pt_clue_asin, "append", confi
 
 # 店铺挖掘提报数据入库
 sql_engine.data_to_sql(df_clue_shop, data_path.pt_seed_asin, "append", config.connet_clue_shop_db_sql)
+
+sql_engine.data_to_sql(df_shop_follow_ai, data_path.seller_product_follow, "append", config.connet_product_db_sql)

@@ -55,7 +55,7 @@ def tag_tag_rank(tag, tag_col):
 
 
 # 价格打标
-sellersprite_database = 'sellersprite_202411'
+sellersprite_database = config.sellersprite_database
 
 df_clue_self = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                              config.clue_self_database, sql.sql_clue_self)
@@ -159,6 +159,6 @@ connet_sellersprite_db = 'mysql+pymysql://' + config.sellersprite_username + ':'
                          + '@' + config.sellersprite_hostname + '/' + sellersprite_database + '?charset=utf8mb4'
 sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', connet_sellersprite_db)
 
-sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', config.connet_product_db_sql)
+# sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', config.connet_product_db_sql)
 
 print('done')

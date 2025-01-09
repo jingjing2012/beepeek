@@ -44,7 +44,7 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
                 sql.duplicate_sql_supplement)
 """
 # 总数据量
-total_rows = 600000
+total_rows = 800000
 # 每页查询的数据量
 page_size = 3000
 # 需要查询的总页数
@@ -96,6 +96,13 @@ for page in range(total_pages):
                                                          db_util.group_traffic_sql(page_size, start_index,
                                                                                    path.pt_relevance_asins_old,
                                                                                    path.pt_relation_traffic_old))
+
+    df_relation_older = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
+                                                           config.sellersprite_database,
+                                                           db_util.group_traffic_sql(page_size, start_index,
+                                                                                     path.pt_relevance_asins_older,
+                                                                                     path.pt_relation_traffic_older))
+
     # df_relation_add = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
     #                                      config.sellersprite_database, sql_traffic_add)
 
@@ -103,8 +110,9 @@ for page in range(total_pages):
 
     # 2.数据预处理
     start_time = time.time()
-    # df_relation_old.pop('traffic_id')
-    df_relation = pd.concat([df_relation, df_relation_old])
+    df_relation_old.pop('traffic_id')
+    df_relation_older.pop('traffic_id')
+    df_relation = pd.concat([df_relation, df_relation_old, df_relation_older])
     # 字段整理
     df_relation['ASIN'] = df_relation['asin']
     df_relation = df_relation[(df_relation['relevance'] >= 0.5) & (df_relation['category_relevance'] >= 0)]
@@ -1201,13 +1209,15 @@ for page in range(total_pages):
     print("数据入库用时：" + (time.time() - start_time).__str__())
 print("用时：" + (time.time() - start_time).__str__())
 
+# 父体去重
+sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql3)
+
 """
 # 类目利基去重
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.pmi_rank_sql)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql1)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql2)
-# 父体去重
-sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql3)
+
 # 历史开售产品去重
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql4)
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database, sql.duplicate_sql5)

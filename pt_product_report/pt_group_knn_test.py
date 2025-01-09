@@ -137,7 +137,7 @@ print('Classification Report:')
 print(class_report)
 """
 
-print("--------------------------自动调参 V1--------------------------------")
+print("自动调参 V1-")
 
 
 def GridSearchCV_work(pipeline, train_x, train_y, test_x, test_y, param_grid, score):
@@ -194,7 +194,7 @@ for model, model_name, model_param_prid in zip(classifiers, classifier_names, cl
     print(f'Model: {model_name}')
     result = GridSearchCV_work(pipeline, train_mm_x, train_y, test_mm_x, test_y, model_param_prid, 'f1')
 
-print("--------------------------自动调参 V2--------------------------------")
+print("自动调参 V2-")
 
 
 def GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x, test_y, score):
@@ -248,6 +248,14 @@ models = {
 }
 
 param_grids = {
+    'svc': {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.1, 1]},
+    'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
+    'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 70, 80, 100, 150, 200],
+                               'randomforestclassifier__max_depth': [None, 2, 3, 5, 7, 10, 15]},
+    'kneighborsclassifier': {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]}
+}
+"""
+param_grids = {
     'svc': {'svc__C': [0.01, 0.1, 1, 10, 100, 1000],  # 正则化参数：控制过拟合与欠拟合的平衡
             'svc__gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10],  # 核函数系数：定义 RBF、poly 等核函数的影响范围
             'svc__kernel': ['linear', 'poly', 'rbf', 'sigmoid']},  # 核函数类型：选择不同的核方法
@@ -272,29 +280,29 @@ param_grids = {
     #                                'gradientboostingclassifier__min_samples_split': [2, 5, 10],
     #                                'gradientboostingclassifier__min_samples_leaf': [1, 2, 4]}
 }
-
+"""
 # 迭代不同的模型和参数网格进行搜索和评估
 
-print("--------------------------自动调参 V2_accuracy--------------------------------")
+print("自动调参 V2_accuracy-")
 result = {}
 for model_name, model in models.items():
     param_grid = param_grids[model_name]
     result[model_name] = GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x, test_y,
                                               'accuracy')
 
-print("--------------------------自动调参 V2_recall--------------------------------")
+print("自动调参 V2_recall-")
 result = {}
 for model_name, model in models.items():
     param_grid = param_grids[model_name]
     result[model_name] = GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x, test_y, 'recall')
 
-print("--------------------------自动调参 V2_F1--------------------------------")
+print("自动调参 V2_F1-")
 result = {}
 for model_name, model in models.items():
     param_grid = param_grids[model_name]
     result[model_name] = GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x, test_y, 'f1')
 
-print("--------------------------自动调参 V2_roc_auc--------------------------------")
+print("自动调参 V2_roc_auc-")
 result = {}
 for model_name, model in models.items():
     param_grid = param_grids[model_name]
