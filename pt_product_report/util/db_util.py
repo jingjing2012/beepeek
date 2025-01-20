@@ -1,7 +1,45 @@
 # 做数据库操作，连接数据库等等
 
+def group_asin_sql(id_start, id_increment):
+    sql_group_asin = """
+    SELECT
+        asin AS "related_asin",price,recommend,blue_ocean_estimate
+    FROM
+        pt_product_get_group
+    """
+    sql_asin = sql_group_asin + ' WHERE id >' + id_start + ' ORDER BY id ASC LIMIT ' + id_increment
+    return sql_asin
 
-def group_asin_sql(group_page_size, group_start_index):
+
+def group_duplicate_sql(id_start, id_increment, group_duplicate):
+    sql_duplicate = 'SELECT ' + group_duplicate + '.asin AS "related_asin",' + group_duplicate + '.rank as pmi_rank,' \
+                    + group_duplicate + '.duplicate_tag,' + group_duplicate + '.duplicate_type FROM (' + \
+                    group_asin_sql(id_start, id_increment) + ') pt_product INNER JOIN ' + group_duplicate \
+                    + ' ON pt_product.related_asin = ' + group_duplicate + '.asin'
+    return sql_duplicate
+
+
+def group_traffic_sql(id_start, id_increment, group_relevance, group_traffic):
+    sql_relevance = 'SELECT ' + group_relevance + '.* FROM (' + group_asin_sql(id_start, id_increment) + \
+                    ') pt_product INNER JOIN ' + group_relevance + \
+                    ' ON pt_product.related_asin = ' + group_relevance + '.asin'
+    sql_traffic = 'SELECT pt_relevance.asin as "related_asin",pt_relevance.relevance,pt_relevance.category_relevance,' \
+                  + group_traffic + '.*,SUBSTRING_INDEX(' + group_traffic + '.category_path,":",2) as "二级类目" FROM( ' \
+                  + sql_relevance + ' ) pt_relevance INNER JOIN ' + group_traffic + \
+                  ' ON pt_relevance.relation_traffic_id = ' + group_traffic + '.id'
+    return sql_traffic
+
+
+def group_traffic_add_sql(id_start, id_increment, group_supplement_competitors):
+    sql_traffic_add = 'SELECT ' + group_supplement_competitors + '.clue_asin as related_asin,' \
+                      + group_supplement_competitors + '.*,SUBSTRING_INDEX(' + group_supplement_competitors + \
+                      '.category_path,":",2) as "二级类目" FROM ( ' + group_asin_sql(id_start, id_increment) \
+                      + ' ) pt_asin LEFT JOIN ' + group_supplement_competitors + ' ON pt_asin.related_asin=' + \
+                      group_supplement_competitors + '.clue_asin WHERE supplement_competitors.id>0'
+    return sql_traffic_add
+
+
+def group_asin_page_sql(group_page_size, group_start_index):
     sql_group_asin = """
     SELECT
         asin AS "related_asin",price,recommend,blue_ocean_estimate
@@ -12,7 +50,7 @@ def group_asin_sql(group_page_size, group_start_index):
     return sql_asin
 
 
-def group_duplicate_sql(group_page_size, group_start_index, group_duplicate):
+def group_duplicate_page_sql(group_page_size, group_start_index, group_duplicate):
     sql_duplicate = 'SELECT ' + group_duplicate + '.asin AS "related_asin",' + group_duplicate + '.rank as pmi_rank,' \
                     + group_duplicate + '.duplicate_tag,' + group_duplicate + '.duplicate_type FROM (' + \
                     group_asin_sql(group_page_size, group_start_index) + ') pt_product INNER JOIN ' + group_duplicate \
@@ -20,7 +58,7 @@ def group_duplicate_sql(group_page_size, group_start_index, group_duplicate):
     return sql_duplicate
 
 
-def group_traffic_sql(group_page_size, group_start_index, group_relevance, group_traffic):
+def group_traffic_page_sql(group_page_size, group_start_index, group_relevance, group_traffic):
     sql_relevance = 'SELECT ' + group_relevance + '.* FROM (' + group_asin_sql(group_page_size, group_start_index) + \
                     ') pt_product INNER JOIN ' + group_relevance + \
                     ' ON pt_product.related_asin = ' + group_relevance + '.asin'
@@ -31,7 +69,7 @@ def group_traffic_sql(group_page_size, group_start_index, group_relevance, group
     return sql_traffic
 
 
-def group_traffic_add_sql(group_page_size, group_start_index, group_supplement_competitors):
+def group_traffic_add_page_sql(group_page_size, group_start_index, group_supplement_competitors):
     sql_traffic_add = 'SELECT ' + group_supplement_competitors + '.clue_asin as related_asin,' \
                       + group_supplement_competitors + '.*,SUBSTRING_INDEX(' + group_supplement_competitors + \
                       '.category_path,":",2) as "二级类目" FROM ( ' + group_asin_sql(group_page_size, group_start_index) \

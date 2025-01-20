@@ -42,64 +42,72 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
                 sql.create_index_sql_supplement)
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                 sql.duplicate_sql_supplement)
-"""
+
+
 # 总数据量
 total_rows = 800000
 # 每页查询的数据量
 page_size = 3000
 # 需要查询的总页数
 total_pages = total_rows // page_size + 1
+"""
+# 循环参数
+id_start = 0
+id_increment = 3000
+id_end = 800000
 
 # 更新日期
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
 start_time = time.time()
-df_famous_brand = sql_engine.connect_pt_product_page(config.oe_hostname, config.oe_password, path.product_database,
-                                                     sql.famous_brand_sql)
-df_holiday = sql_engine.connect_pt_product_page(config.oe_hostname, config.oe_password, path.product_database,
-                                                sql.holiday_sql)
+df_famous_brand = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
+                                                sql.famous_brand_sql)
+df_holiday = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
+                                           sql.holiday_sql)
 
 # 机器学习训练数据准备
-df_group_knn = sql_engine.connect_pt_product_page(config.oe_hostname, config.oe_password, config.product_database,
-                                                  sql.sampling_knn_sql)
+df_group_knn = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                             sql.sampling_knn_sql)
 models = knn.model_parameter()
 knn.model_training(df_group_knn, models)
-
+"""
 for page in range(total_pages):
     # 计算查询的起始位置
     start_index = page * page_size
     end_index = min((page + 1) * page_size, total_pages)
-    # 执行查询操作
+    # 执行查询操作"""
+
+while id_start < id_end:
     # 1.数据连接
     start_time = time.time()
 
     df_product = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
                                                     config.sellersprite_database,
-                                                    db_util.group_asin_sql(page_size, start_index))
+                                                    db_util.group_asin_sql(id_start, id_increment))
 
     if df_product.empty:
         break
 
     df_duplicate = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
                                                       config.sellersprite_database,
-                                                      db_util.group_duplicate_sql(page_size, start_index,
+                                                      db_util.group_duplicate_sql(id_start, id_increment,
                                                                                   path.pt_product_duplicate))
 
     df_relation = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
                                                      config.sellersprite_database,
-                                                     db_util.group_traffic_sql(page_size, start_index,
+                                                     db_util.group_traffic_sql(id_start, id_increment,
                                                                                path.pt_relevance_asins,
                                                                                path.pt_relation_traffic))
 
     df_relation_old = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
                                                          config.sellersprite_database,
-                                                         db_util.group_traffic_sql(page_size, start_index,
+                                                         db_util.group_traffic_sql(id_start, id_increment,
                                                                                    path.pt_relevance_asins_old,
                                                                                    path.pt_relation_traffic_old))
 
     df_relation_older = sql_engine.connect_pt_product_page(config.sellersprite_hostname, config.sellersprite_password,
                                                            config.sellersprite_database,
-                                                           db_util.group_traffic_sql(page_size, start_index,
+                                                           db_util.group_traffic_sql(id_start, id_increment,
                                                                                      path.pt_relevance_asins_older,
                                                                                      path.pt_relation_traffic_older))
 
@@ -1205,7 +1213,9 @@ for page in range(total_pages):
     sql_engine.data_to_sql(df_group, path.product_group_history, 'append', config.connet_product_db_sql)
     sql_engine.data_to_sql(df_group_tag, path.product_group_tag_history, 'append', config.connet_product_db_sql)
 
-    print("page：" + page.__str__())
+    # print("page：" + page.__str__())
+    id_start = id_start + id_increment
+    print("id_start：" + id_start.__str__())
     print("数据入库用时：" + (time.time() - start_time).__str__())
 print("用时：" + (time.time() - start_time).__str__())
 
@@ -1229,3 +1239,5 @@ sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_
 """
 sql_engine.connect_product(config.oe_hostname, config.oe_password, path.product_database,
                            sql.update_sql_product_group_tag)
+
+

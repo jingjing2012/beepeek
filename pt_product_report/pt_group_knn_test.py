@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import preprocessing
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, \
     confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
@@ -175,15 +175,15 @@ classifier_names = [
     'svc',
     'decisiontreeclassifier',
     'randomforestclassifier',
-    'kneighborsclassifier'
+    # 'kneighborsclassifier'
 ]
 
 # 分类器参数
 classifier_param_grid = [
     {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.01, 1]},
     {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
-    {'randomforestclassifier__n_estimators': [10, 50, 100, 200]},
-    {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]}
+    {'randomforestclassifier__n_estimators': [10, 50, 70, 90, 100, 150, 200]},
+    # {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]}
 ]
 
 for model, model_name, model_param_prid in zip(classifiers, classifier_names, classifier_param_grid):
@@ -239,20 +239,25 @@ def GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x
 
 # 定义模型和参数网格
 models = {
-    'svc': SVC(random_state=42, kernel='rbf', class_weight='balanced'),
+    # 'svc': SVC(random_state=42, kernel='rbf', class_weight='balanced'),
     # 'svc': SVC(random_state=42, kernel='rbf', probability=True),
-    'decisiontreeclassifier': DecisionTreeClassifier(random_state=42, criterion='gini'),
+    # 'decisiontreeclassifier': DecisionTreeClassifier(random_state=42, criterion='gini'),
     'randomforestclassifier': RandomForestClassifier(random_state=42, criterion='gini'),
-    'kneighborsclassifier': KNeighborsClassifier(metric='minkowski'),
+    # 'kneighborsclassifier': KNeighborsClassifier(metric='minkowski'),
     # 'gradientboostingclassifier': GradientBoostingClassifier(random_state=42)
 }
 
 param_grids = {
-    'svc': {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.1, 1]},
-    'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
-    'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 70, 80, 100, 150, 200],
-                               'randomforestclassifier__max_depth': [None, 2, 3, 5, 7, 10, 15]},
-    'kneighborsclassifier': {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]}
+    # 'svc': {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.1, 1]},
+    # 'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
+    'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 70, 90, 100, 150, 200],
+                               'randomforestclassifier__max_depth': [None, 2, 3, 5, 7, 10, 15],
+                               # 'randomforestclassifier__max_features': ['sqrt', 'log2', None, 0.5]
+                               },
+    # 'kneighborsclassifier': {'kneighborsclassifier__n_neighbors': [3, 5, 7, 9]},
+    # 'gradientboostingclassifier': {'gradientboostingclassifier__n_estimators': [50, 100, 200],
+    #                                'gradientboostingclassifier__learning_rate': [0.01, 0.1, 0.2],
+    #                                'gradientboostingclassifier__max_depth': [3, 5, 7]}
 }
 """
 param_grids = {

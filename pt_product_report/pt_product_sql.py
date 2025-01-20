@@ -2,6 +2,9 @@
 import pt_product_report_path as path
 from conn import mysql_config as config
 
+# 更新日期
+update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
+
 # 辅助表
 holiday_sql = 'select 节日关键词 from ' + path.product_database + '.' + path.product_holiday
 famous_brand_sql = 'select brand,预估影响力 as "疑似知名品牌" from ' + path.product_database + '.' + path.product_famous_brand
@@ -384,9 +387,6 @@ sql_sellersprite_clue_position = 'select `asin` from ' + path.pt_clue_asin
 sql_sellersprite_clue_shop = 'select `asin` from ' + path.pt_seed_asin
 
 # 类目去重
-# 更新日期
-update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
-
 duplicate_sql1 = 'UPDATE product_group_history SET `重复利基`=0 WHERE `数据更新时间`="' + str(update_date) + \
                  '" AND `代表节点` IN (SELECT `代表节点` FROM(SELECT `代表节点`,count(`原ASIN`) "利基数量" FROM ' \
                  'product_group_history WHERE `数据更新时间`="' + str(update_date) + '" GROUP BY `代表节点`) ' + \
@@ -553,7 +553,9 @@ sampling_knn_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_samplin
                    + path.product_clue_sampling + '.clue_asin=product_group_self.`原ASIN` ' + \
                    'WHERE ' + path.product_clue_sampling + '.`status`=2 AND product_group_self.`有销额竞品款数`>=5'
 
-sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`="2024-07-01" AND `有销额竞品款数`>=5 AND `重复利基`=0'
+sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`=' + update_date + ' AND `有销额竞品款数`>=5 AND `重复利基`=0'
+
+sampling_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`=' + update_date + ' AND `有销额竞品款数`>=5'
 
 # 竞品提报查重
 sql_position_competitior = 'SELECT CONCAT(' + path.expand_competitors + '.ASIN," | ",' + path.expand_competitors + \

@@ -29,6 +29,20 @@ def model_prepare(df):
     return df_train
 
 
+"""
+# 机器学习训练最优参数
+def model_parameter(max_depth, n_estimators):
+    models = {
+        # 'svc': SVC(random_state=42, kernel='rbf', class_weight='balanced', C=1, gamma=1),
+        # 'decisiontreeclassifier': DecisionTreeClassifier(random_state=42, criterion='gini', max_depth=15,
+        #                                                  min_samples_split=5),
+        'randomforestclassifier': RandomForestClassifier(random_state=42, criterion='gini', max_depth=max_depth,
+                                                         n_estimators=n_estimators)
+    }
+    return models
+"""
+
+
 # 机器学习训练最优参数
 def model_parameter():
     models = {
@@ -76,11 +90,26 @@ def model_predict(df, model_name):
     return predict_y
 
 
-"""
+# -------------------------------------精铺-----------------------------------------------
 # 机器学习训练数据准备
 df_group_knn = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                              sql.sampling_knn_sql)
 models = model_parameter()
+model_training(df_group_knn, models)
+
+df_group = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                         sql.sampling_group_sql)
+
+# 机器学习预测
+for model_name in models.keys():
+    # df_group.insert(loc=0, column='idx', value=df_group.index)
+    df_group[f'{model_name}_predict'] = model_predict(df_group, model_name)
+
+"""
+# 机器学习训练数据准备
+df_group_knn = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                             sql.sampling_knn_sql)
+models = model_parameter(2, 70)
 model_training(df_group_knn, models)
 
 # 机器学习预测
@@ -88,10 +117,16 @@ df_group = df_group_knn.drop(columns=['clue_tag'], errors='ignore')
 for model_name in models.keys():
     df_group[f'{model_name}_predict'] = model_predict(df_group, model_name)
 
+# df_predict = df_group[
+#     ['原ASIN', '数据更新时间', 'svc_predict', 'decisiontreeclassifier_predict', 'randomforestclassifier_predict',
+#      'kneighborsclassifier_predict']]
 df_predict = df_group[
-    ['原ASIN', '数据更新时间', 'svc_predict', 'decisiontreeclassifier_predict', 'randomforestclassifier_predict',
-     'kneighborsclassifier_predict']]
-sql_engine.data_to_sql(df_predict, path.product_group_sampling_predict, 'append', config.connet_product_db_sql)
+    ['原ASIN', '数据更新时间', 'randomforestclassifier_predict']]
+sql_engine.data_to_sql(df_predict, path.product_group_sampling_predict_fbm, 'append', config.connet_product_db_sql)
 
 print('done')
+
+# model_parameter(15, 200)
+#
+# model_parameter(2, 70)
 """

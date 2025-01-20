@@ -96,8 +96,8 @@ product_traffic_tag_self = 'product_traffic_tag_self'
 # 线索检验
 # 数据源库
 clue_sampling = 'clue_sampling'
-# product_clue_sampling = 'product_clue_sampling'
-product_clue_sampling = 'product_clue_sampling_fbm'
+product_clue_sampling = 'product_clue_sampling'
+# product_clue_sampling = 'product_clue_sampling_fbm'
 product_clue_sbi = 'product_clue_sbi'
 product_clue_fbm = 'product_clue_fbm'
 # 目标数据
@@ -118,6 +118,7 @@ product_group_correction_pmi = 'product_group_correction_pmi'
 product_group_sampling_pmi = 'product_group_sampling_pmi'
 
 product_group_sampling_predict = 'product_group_sampling_predict'
+product_group_sampling_predict_fbm = 'product_group_sampling_predict_fbm'
 
 # 定位竞品提报
 # 数据库

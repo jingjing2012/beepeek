@@ -83,6 +83,7 @@ df_position_self.rename(columns={'ASIN': 'asin',
                                  '是否查询UK站点': 'status_uk',
                                  '是否查询DE站点': 'status_de',
                                  '提报人': 'name',
+                                 '提报批次': 'data_tag',
                                  '提报日期': 'update_time'}, inplace=True)
 df_position_self = df_position_self[df_position_self['去重'] == 1]
 df_position_self['status_uk'] = df_position_self['status_uk'].map({'是': 1, '否': 0})
@@ -149,7 +150,7 @@ df_clue_pt = pd.concat([df_clue_self_pt, df_clue_sampling_pt, df_clue_sbi_pt, df
 
 df_clue_position = df_clue_position[
     ['asin', 'image', 'price_us', 'price_uk', 'price_de', 'rating', 'ratings', 'length_max', 'length_mid', 'length_min',
-     'weight', 'price_value', 'status_uk', 'status_de', 'name', 'update_time']]
+     'weight', 'price_value', 'status_uk', 'status_de', 'name', 'data_tag', 'update_time']]
 
 # 数据入库
 sql_engine.data_to_sql(df_clue_pt, data_path.pt_clue_asin, "append", config.connet_clue_self_db_sql)
