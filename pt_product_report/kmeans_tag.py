@@ -44,7 +44,8 @@ def tag_k_means(tag_col):
     k_model_tag = k_model_tag.round(1)
     tag_max = round(tag_col.max() * 100, 2)
     tag_col = [0] + list(k_model_tag[0]) + [tag_max]
-    return tag_col
+    tag_col_unique = sorted(set(tag_col))
+    return tag_col_unique
 
 
 def tag_tag_rank(tag, tag_col):

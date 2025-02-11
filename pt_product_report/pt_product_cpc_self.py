@@ -30,6 +30,12 @@ with warnings.catch_warnings():
 
 start_time = time.time()
 
+# cpc数据处理
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, path.clue_self,
+                           sql.clean_sql_cpc_from_keywords)
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, path.clue_self,
+                           sql.insert_sql_cpc_from_keywords)
+
 # 1.数据连接
 df_kw = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                       config.clue_self_database, sql.sql_kw)

@@ -40,9 +40,10 @@ def price_k_means(price):
     k_model_sort = pd.DataFrame(k_model.cluster_centers_).sort_values(0)
     k_model_price = k_model_sort.rolling(2).mean().iloc[1:]
     k_model_price = k_model_price.round(1)
-    price_max = round(price.max() * 100, 2)
+    price_max = round(price.max() * 100, 1)
     price_list = [0] + list(k_model_price[0]) + [price_max]
-    return price_list
+    price_list_unique = sorted(set(price_list))
+    return price_list_unique
 
 
 def price_tag_rank(price, price_list):

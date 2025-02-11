@@ -40,8 +40,8 @@ id_end = 2000000
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
 # cpc数据写入
-# sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-#                            sql.insert_sql_cpc_from_keywords)
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
+                           sql.insert_sql_cpc_from_keywords)
 
 while id_start < id_end:
     # 1.数据连接
@@ -206,11 +206,11 @@ while id_start < id_end:
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.update_sql_sub_category)
 
-"""
+
 # 关联流量历史数据复用
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.insert_sql_pt_relevance_asins_old)
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.insert_sql_pt_relation_traffic_old)
-"""
+
 print("用时：" + (time.time() - start_time).__str__())

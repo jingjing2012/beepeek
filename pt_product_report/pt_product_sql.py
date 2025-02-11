@@ -162,6 +162,7 @@ INSERT INTO cpc_from_keywords ( `id`, `keyword`, `auxiliary_k`, `bid_rangeMedian
 ORDER BY
 	`sellersprite_cpc`.`cpc_from_keywords`.`id`)
 """
+clean_sql_cpc_from_keywords = "TRUNCATE TABLE cpc_from_keywords"
 
 #
 create_sql_pt_product_duplicate = """
@@ -553,9 +554,19 @@ sampling_knn_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_samplin
                    + path.product_clue_sampling + '.clue_asin=product_group_self.`原ASIN` ' + \
                    'WHERE ' + path.product_clue_sampling + '.`status`=2 AND product_group_self.`有销额竞品款数`>=5'
 
-sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`=' + update_date + ' AND `有销额竞品款数`>=5 AND `重复利基`=0'
+sampling_knn_fba_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_sampling_fba + '.clue_tag="运营有效",1,0) "clue_tag"' + \
+                       ' FROM ' + path.product_clue_sampling_fba + ' LEFT JOIN product_group_self ON ' \
+                       + path.product_clue_sampling_fba + '.clue_asin=product_group_self.`原ASIN` ' + \
+                       'WHERE ' + path.product_clue_sampling_fba + '.`status`=2 AND product_group_self.`有销额竞品款数`>=5'
 
-sampling_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`=' + update_date + ' AND `有销额竞品款数`>=5'
+sampling_knn_fbm_sql = 'SELECT product_group_self.*,IF(' + path.product_clue_sampling_fbm + '.clue_tag="运营有效",1,0) "clue_tag"' + \
+                       ' FROM ' + path.product_clue_sampling_fbm + ' LEFT JOIN product_group_self ON ' \
+                       + path.product_clue_sampling_fbm + '.clue_asin=product_group_self.`原ASIN` ' + \
+                       'WHERE ' + path.product_clue_sampling_fbm + '.`status`=2 AND product_group_self.`有销额竞品款数`>=5'
+
+sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`="' + update_date + '" AND `有销额竞品款数`>=5 AND `重复利基`=0'
+
+sampling_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`="' + update_date + '" AND `有销额竞品款数`>=5'
 
 # 竞品提报查重
 sql_position_competitior = 'SELECT CONCAT(' + path.expand_competitors + '.ASIN," | ",' + path.expand_competitors + \

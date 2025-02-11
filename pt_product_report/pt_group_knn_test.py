@@ -241,7 +241,7 @@ def GridSearchCV_working(model_name, model, param_grid, train_x, train_y, test_x
 models = {
     # 'svc': SVC(random_state=42, kernel='rbf', class_weight='balanced'),
     # 'svc': SVC(random_state=42, kernel='rbf', probability=True),
-    # 'decisiontreeclassifier': DecisionTreeClassifier(random_state=42, criterion='gini'),
+    'decisiontreeclassifier': DecisionTreeClassifier(random_state=42, criterion='gini'),
     'randomforestclassifier': RandomForestClassifier(random_state=42, criterion='gini'),
     # 'kneighborsclassifier': KNeighborsClassifier(metric='minkowski'),
     # 'gradientboostingclassifier': GradientBoostingClassifier(random_state=42)
@@ -249,7 +249,7 @@ models = {
 
 param_grids = {
     # 'svc': {'svc__C': [0.1, 1, 10, 100], 'svc__gamma': [0.001, 0.01, 0.1, 1]},
-    # 'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
+    'decisiontreeclassifier': {'decisiontreeclassifier__max_depth': [3, 5, 10, 15]},
     'randomforestclassifier': {'randomforestclassifier__n_estimators': [10, 50, 70, 90, 100, 150, 200],
                                'randomforestclassifier__max_depth': [None, 2, 3, 5, 7, 10, 15],
                                # 'randomforestclassifier__max_features': ['sqrt', 'log2', None, 0.5]

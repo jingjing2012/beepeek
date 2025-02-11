@@ -8,7 +8,7 @@ from conn import sql_engine, mysql_config as config
 import pt_product_report_parameter as para
 import pt_product_report_path as path
 import pt_product_sql as sql
-import pt_group_knn as knn
+# import pt_group_knn as knn
 from util import duplicate_util, data_cleaning_util, calculate_util, calculation_util, common_util, db_util
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -65,11 +65,12 @@ df_famous_brand = sql_engine.connect_pt_product(config.oe_hostname, config.oe_pa
 df_holiday = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
                                            sql.holiday_sql)
 
-# 机器学习训练数据准备
+"""# 机器学习训练数据准备
 df_group_knn = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                              sql.sampling_knn_sql)
 models = knn.model_parameter()
 knn.model_training(df_group_knn, models)
+"""
 """
 for page in range(total_pages):
     # 计算查询的起始位置
@@ -1202,11 +1203,11 @@ while id_start < id_end:
 
     print("字段整合用时：" + (time.time() - start_time).__str__())
 
-    # 机器学习预测
+    """# 机器学习预测
     for model_name in models.keys():
         # df_group.insert(loc=0, column='idx', value=df_group.index)
         df_group[f'{model_name}_predict'] = knn.model_predict(df_group, model_name)
-
+    """
     # 8.存入数据库
     start_time = time.time()
     sql_engine.data_to_sql(df_traffic_table, path.product_traffic_history, 'append', config.connet_product_db_sql)

@@ -42,6 +42,7 @@ df_seller_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_pas
 df_brand_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
                                               sql.brand_self_sql)
 
+"""
 # 线索数据去重
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.duplicate_sql_product_report)
@@ -68,7 +69,8 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
 
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.create_index_sql_relevance_2)
-
+"""
+# 参数
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
 start_time = time.time()
@@ -322,7 +324,7 @@ while row_start < row_max:
     df_product = df_product[df_product['seller_status'] < 1]
 
     # 排除公司内品牌
-    df_product = df_product.merge(df_seller_self, how='left', on='brand')
+    df_product = df_product.merge(df_brand_self, how='left', on='brand')
     df_product['brand_status'] = df_product['brand_status'].fillna(0)
     df_product = df_product[df_product['brand_status'] < 1]
 

@@ -7,7 +7,7 @@ def group_asin_sql(id_start, id_increment):
     FROM
         pt_product_get_group
     """
-    sql_asin = sql_group_asin + ' WHERE id >' + id_start + ' ORDER BY id ASC LIMIT ' + id_increment
+    sql_asin = sql_group_asin + ' WHERE id >' + str(id_start) + ' ORDER BY id ASC LIMIT ' + str(id_increment)
     return sql_asin
 
 

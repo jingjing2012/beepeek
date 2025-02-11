@@ -35,8 +35,9 @@ def price_k_means(price, k):
     k_model_sort = pd.DataFrame(k_model.cluster_centers_).sort_values(0)
     k_model_price = k_model_sort.rolling(2).mean().iloc[1:]
     k_model_price = k_model_price.round(1)
-    price_list = [0] + list(k_model_price[0]) + [price.max() + 1] + [price.max() * 100]
-    return price_list
+    price_list = [0] + list(k_model_price[0]) + [round(price.max() + 5, 1)] + [round(price.max() * 100, 1)]
+    price_list_unique = sorted(set(price_list))
+    return price_list_unique
 
 
 def price_tag(df, price_col, price_list_col):
@@ -120,9 +121,9 @@ df_price_tag = df_price_list.groupby(df_price_list['data_id']).apply(
 df_competitiors = pd.merge(df_competitiors, df_price_tag, how='left', on=['data_id', 'price'])
 
 # 竞争力分组
-df_ai['competitive_tag']=common_util.get_cut(df_ai, 'overall_competitiveness', [-99, -0.5, 0.5, 1, 99],
-                    ['软柿子', '实力相当', '慎重选择', '硬茬'])
-df_ai['similarity_tag']=common_util.get_cut(df_ai, 'similarity_score', [0, 4, 7, 10], ['低相似', '中等相似', '高相似'])
+df_ai['competitive_tag'] = common_util.get_cut(df_ai, 'overall_competitiveness', [-99, -0.5, 0.5, 1, 99],
+                                               ['软柿子', '实力相当', '慎重选择', '硬茬'])
+df_ai['similarity_tag'] = common_util.get_cut(df_ai, 'similarity_score', [0, 4, 7, 10], ['低相似', '中等相似', '高相似'])
 
 # 星数分级
 cal_util.get_mround(df_competitiors, 'ratings', 'ratings_tag', 100)
