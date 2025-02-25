@@ -45,22 +45,27 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="pandas.io.sql"
 warnings.filterwarnings("ignore", category=UserWarning, module='pandas')
 warnings.filterwarnings("ignore", message="pandas only support SQLAlchemy connectable.*")
 
-# 数据读取
+# ---------------------------------------数据读取---------------------------------------
+
+# beepeek自主提报
 df_product_self = data_read(data_path.pt_product_table_self, data_path.sheet_self)
+# pmi算法验证数据源
 df_product_sampling = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.sbi_database,
                                                     sql.sql_product_sampling)
+# 精铺历史开售产品
 df_product_sbi = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                                sql.sql_product_sbi)
+# 定位相似竞品提报
 df_position_self = data_read(data_path.position_table_self, data_path.sheet_position)
+# 直发历史开品
 df_product_fbm1 = data_read(data_path.pt_product_table_fbm, data_path.sheet_fbm1)
+# 直发历史线索
 df_product_fbm2 = data_read(data_path.pt_product_table_fbm, data_path.sheet_fbm2)
-
+# 店铺挖掘自主提报
 df_shop_self = data_read(data_path.pt_shop_table_self, data_path.sheet_shop)
 
-df_shop_follow = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                               config.clue_shop_database, sql.sql_shop_follow)
+# ---------------------------------------数据处理---------------------------------------
 
-# 数据处理
 df_product_self = df_product_self[['ASIN', '提报人员', '提报日期', '批次Tag']]
 df_product_self.rename(columns={'ASIN': 'asin',
                                 '提报人员': 'name',
@@ -73,8 +78,6 @@ df_position_self.rename(columns={'ASIN': 'asin',
                                  '价格_美元': 'price_us',
                                  '价格_英镑': 'price_uk',
                                  '价格_欧元': 'price_de',
-                                 '星级': 'rating',
-                                 '星数': 'ratings',
                                  '最长边_厘米': 'length_max',
                                  '次长边_厘米': 'length_mid',
                                  '最短边_厘米': 'length_min',
@@ -83,7 +86,7 @@ df_position_self.rename(columns={'ASIN': 'asin',
                                  '是否查询UK站点': 'status_uk',
                                  '是否查询DE站点': 'status_de',
                                  '提报人': 'name',
-                                 '提报批次': 'data_tag',
+                                 '业务线': 'data_tag',
                                  '提报日期': 'update_time'}, inplace=True)
 df_position_self = df_position_self[df_position_self['去重'] == 1]
 df_position_self['status_uk'] = df_position_self['status_uk'].map({'是': 1, '否': 0})
@@ -99,7 +102,8 @@ df_shop_self.rename(columns={'ASIN': 'asin',
                              '提报日期': 'task_time',
                              '任务名称': 'task_tag'}, inplace=True)
 
-# 爬取数据去重
+# ---------------------------------------爬取数据去重---------------------------------------
+
 df_clue = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                         config.clue_self_database, sql.sql_sellersprite_clue_self)
 df_position = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
@@ -114,7 +118,8 @@ df_clue_position = data_duplicate(df_position_self, df_position)
 df_product_fbm_pt = data_duplicate(df_product_fbm, df_clue)
 df_clue_shop = data_duplicate(df_shop_self, df_shop)
 
-# 历史记录数据去重
+# ---------------------------------------历史记录数据去重---------------------------------------
+
 df_clue_self_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                                      sql.sql_clue_self_history)
 df_clue_sampling_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password,
@@ -125,17 +130,13 @@ df_clue_sbi_history = sql_engine.connect_pt_product(config.oe_hostname, config.o
 df_clue_fbm_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                                     sql.sql_clue_fbm_history)
 
-df_shop_follow_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
-                                                       sql.sql_shop_follow_history)
-
 df_clue_self = data_duplicate(df_product_self, df_clue_self_history)
 df_clue_sampling = data_duplicate(df_product_sampling, df_clue_sampling_history)
 df_clue_sbi = data_duplicate(df_product_sbi, df_clue_sbi_history)
 df_clue_fbm = data_duplicate(df_product_fbm, df_clue_fbm_history)
 
-df_shop_follow_ai = data_duplicate(df_shop_follow, df_shop_follow_history)
+# ---------------------------------------数据整合---------------------------------------
 
-# 数据整合
 df_clue_self_pt = df_product_self_pt[['asin', 'update_time']]
 df_clue_self_pt['data_tag'] = '自主提报'
 
@@ -149,10 +150,11 @@ df_clue_sbi_pt['data_tag'] = '历史开售'
 df_clue_pt = pd.concat([df_clue_self_pt, df_clue_sampling_pt, df_clue_sbi_pt, df_clue_fbm], ignore_index=True)
 
 df_clue_position = df_clue_position[
-    ['asin', 'image', 'price_us', 'price_uk', 'price_de', 'rating', 'ratings', 'length_max', 'length_mid', 'length_min',
+    ['asin', 'image', 'price_us', 'price_uk', 'price_de', 'length_max', 'length_mid', 'length_min',
      'weight', 'price_value', 'status_uk', 'status_de', 'name', 'data_tag', 'update_time']]
 
-# 数据入库
+# ---------------------------------------数据入库---------------------------------------
+
 sql_engine.data_to_sql(df_clue_pt, data_path.pt_clue_asin, "append", config.connet_clue_self_db_sql)
 
 sql_engine.data_to_sql(df_clue_self, data_path.product_clue_self, "append", config.connet_product_db_sql)
@@ -166,4 +168,10 @@ sql_engine.data_to_sql(df_clue_position, data_path.pt_clue_asin, "append", confi
 # 店铺挖掘提报数据入库
 sql_engine.data_to_sql(df_clue_shop, data_path.pt_seed_asin, "append", config.connet_clue_shop_db_sql)
 
+# 店铺挖掘可跟卖线索知产速筛
+df_shop_follow = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                               config.clue_shop_database, sql.sql_shop_follow)
+df_shop_follow_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                                       sql.sql_shop_follow_history)
+df_shop_follow_ai = data_duplicate(df_shop_follow, df_shop_follow_history)
 sql_engine.data_to_sql(df_shop_follow_ai, data_path.seller_product_follow, "append", config.connet_product_db_sql)

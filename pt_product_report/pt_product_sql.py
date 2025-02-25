@@ -88,6 +88,14 @@ update_sql_sub_category = "UPDATE pt_product_get_group INNER JOIN pt_product_rep
 
 sql_get_group = 'select * from ' + path.pt_product_get_group
 
+sql_get_group_status = 'select * from ' + path.pt_product_get_group + ' where status=-10'
+
+sql_get_duplicate = 'select * from ' + path.pt_product_duplicate
+
+sql_relevance_asins = 'select * from ' + path.pt_relevance_asins
+
+sql_group_predict = 'select * from ' + path.product_group_predict + 'WHERE `数据更新时间`="' + update_date
+
 # group表
 
 # 索引创建
@@ -106,6 +114,17 @@ clear_sql_product_group_tag = "TRUNCATE TABLE " + path.product_group_tag
 update_sql_product_group_tag = "UPDATE product_tag_history INNER JOIN product_group_tag_history ON " \
                                "product_tag_history.data_id=product_group_tag_history.data_id " \
                                "SET product_tag_history.traffic_status=1"
+
+sql_asin_cpc = "SELECT * FROM pt_product_get_cpc WHERE `status`=0"
+sql_asin_group = "SELECT * FROM pt_product_get_group WHERE `status`=0"
+
+sql_duplicate_update = """
+UPDATE pt_product_get_group
+INNER JOIN pt_product_duplicate ON pt_product_get_group.asin = pt_product_duplicate.asin 
+SET pt_product_get_group.`status` = "-30" 
+WHERE
+	pt_product_duplicate.`duplicate_tag` = "10+";
+"""
 
 # pt_keywords创建
 create_sql_product_pt_keywords = """
@@ -591,6 +610,8 @@ update_position_sql2 = 'UPDATE ' + path.expand_competitors + ' SET tag_status=-1
 update_position_sql3 = 'UPDATE ' + path.expand_competitors + ' SET profit_status=1 WHERE asin IN' \
                                                              '(SELECT ASIN FROM pt_clue_profit)'
 
+update_position_sql4 = 'UPDATE ' + path.pt_clue_asin + ' SET kw_status=1 WHERE asin IN (SELECT asin FROM pt_clue_kw)'
+
 # sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin where clue_status=1'
 sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin'
 # 店铺挖掘
@@ -625,6 +646,49 @@ WHERE
 		pt_brand_competing_report 
 	WHERE
 	task_tag IN ( SELECT DISTINCT task_tag FROM pt_sellers_product WHERE brand_status + seller_status = 2)) 
+"""
+
+# AI自动筛词
+sql_kw_ai_match = """
+SELECT DISTINCT
+	pt_clue_asin.asin,
+	clue_info.site,
+	clue_info.image,
+	clue_info.title 
+FROM
+	pt_clue_asin
+	INNER JOIN clue_info ON pt_clue_asin.asin = clue_info.ASIN 
+WHERE
+	pt_clue_asin.clue_status = 1 
+	AND pt_clue_asin.kw_status = 0 
+	AND (
+	LENGTH( clue_info.image )+ LENGTH( clue_info.title ))>0
+"""
+
+sql_kw_ai_id_start = """
+SELECT DISTINCT
+	MIN(pt_clue_asin.id) AS id_start
+FROM
+	pt_clue_asin
+	INNER JOIN clue_info ON pt_clue_asin.asin = clue_info.ASIN 
+WHERE
+	pt_clue_asin.clue_status = 1 
+	AND pt_clue_asin.kw_status = 0 
+	AND (
+	LENGTH( clue_info.image )+ LENGTH( clue_info.title ))>0
+"""
+
+sql_kw_ai_id_max = """
+SELECT DISTINCT
+	MAX(pt_clue_asin.id) AS id_end 
+FROM
+	pt_clue_asin
+	INNER JOIN clue_info ON pt_clue_asin.asin = clue_info.ASIN 
+WHERE
+	pt_clue_asin.clue_status = 1 
+	AND pt_clue_asin.kw_status = 0 
+	AND (
+	LENGTH( clue_info.image )+ LENGTH( clue_info.title ))>0
 """
 
 # 状态码更新
@@ -667,5 +731,5 @@ FROM
 	pt_sellers_product_follow
 	INNER JOIN pt_sellers_product ON pt_sellers_product_follow.asin = pt_sellers_product.asin 
 WHERE
-	pt_sellers_product_follow.sale_status =0 AND `status`=1
+	pt_sellers_product_follow.currently_unavailable_status =1 AND `status`=1
 """

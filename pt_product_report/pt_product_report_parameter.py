@@ -1065,3 +1065,10 @@ follow_fba_fee_rate_list = [0, 0.05, 0.1, 0.15, 2]  # FBA费用占比分值划�
 follow_fba_fee_rate_label = [4, 3, 2, 1]  # FBA费用占比得分区间
 
 follow_fbm_score = 0.5  # FBM配送方式加分
+
+# 自动筛词API调用
+api_url = 'http://coarse-screen.qingkula.com/full_search/'
+headers = {
+            'Content-Type': 'application/json',
+            # 'Authorization': f'Bearer {API_KEY}'  # 如果需要认证
+        }

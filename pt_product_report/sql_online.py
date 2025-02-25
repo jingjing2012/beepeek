@@ -28,9 +28,13 @@ def extract_insert_statements(file_path, target_table):
 
 if __name__ == '__main__':
     # 调用函数，传入SQL文件的路径
-    sellersprite_target_table_list = ['pt_keywords']
+    sellersprite_target_table_list = ['pt_relation_traffic']
     # sellersprite_target_table_list = ['pt_product_get_group','pt_relation_traffic', 'pt_relevance_asins']
-    sellersprite_file_path = r"\\192.168.10.244\数字化选品\OE数据\product_report_sql\sellersprite_202411.sql"
+    sellersprite_file_path = r"\\192.168.10.244\数字化选品\OE数据\product_report_sql\sellersprite_202401.sql"
 
-    for sellersprite_target_table in sellersprite_target_table_list:
-        extract_insert_statements(sellersprite_file_path, sellersprite_target_table)
+    # for sellersprite_target_table in sellersprite_target_table_list:
+        # extract_insert_statements(sellersprite_file_path, sellersprite_target_table)
+
+    oe_target_table = 'pt_keywords'
+    oe_file_path = r"\\192.168.10.244\数字化选品\OE数据\niche_sql\update\oe_us_20241228.sql"
+    extract_insert_statements(oe_file_path, oe_target_table)

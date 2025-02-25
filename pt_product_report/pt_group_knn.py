@@ -1,3 +1,5 @@
+import sys
+
 import joblib
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -93,46 +95,58 @@ def model_predict(df, model_name):
 
 
 # -------------------------------------数据预测-----------------------------------------------
-# 预测数据准备
+
+df_group_predict = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                                 sql.sql_group_predict)
 df_group = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
                                          sql.sampling_group_sql)
 
-# -------------------------------------精铺预测-----------------------------------------------
-# 机器学习训练数据准备
-df_group_knn_fba = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
-                                                 sql.sampling_knn_fba_sql)
-models = model_parameter(15, 15, 200)
-model_training(df_group_knn_fba, models)
+if df_group_predict.empty and (not df_group.empty):
 
-# 机器学习预测
-for model_name in models.keys():
-    # df_group.insert(loc=0, column='idx', value=df_group.index)
-    df_group[f'{model_name}_predict_fba'] = model_predict(df_group, model_name)
+    # 预测数据准备
+    df_group = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                             sql.sampling_group_sql)
 
-# -------------------------------------直发预测-----------------------------------------------
-# 机器学习训练数据准备
-df_group_knn_fbm = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
-                                                 sql.sampling_knn_fbm_sql)
-models = model_parameter(3, 2, 70)
-model_training(df_group_knn_fbm, models)
+    # -------------------------------------精铺预测-----------------------------------------------
+    # 机器学习训练数据准备
+    df_group_knn_fba = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                                     sql.sampling_knn_fba_sql)
+    models = model_parameter(15, 15, 200)
+    model_training(df_group_knn_fba, models)
 
-# 机器学习预测
-for model_name in models.keys():
-    # df_group.insert(loc=0, column='idx', value=df_group.index)
-    df_group[f'{model_name}_predict_fbm'] = model_predict(df_group, model_name)
+    # 机器学习预测
+    for model_name in models.keys():
+        # df_group.insert(loc=0, column='idx', value=df_group.index)
+        df_group[f'{model_name}_predict_fba'] = model_predict(df_group, model_name)
 
-# -------------------------------------数据整合入库-----------------------------------------------
-df_group['randomforestclassifier_predict'] = np.where(df_group['randomforestclassifier_predict_fba'] == 1, 2,
-                                                      df_group['randomforestclassifier_predict_fbm'])
+    # -------------------------------------直发预测-----------------------------------------------
+    # 机器学习训练数据准备
+    df_group_knn_fbm = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
+                                                     sql.sampling_knn_fbm_sql)
+    models = model_parameter(3, 2, 70)
+    model_training(df_group_knn_fbm, models)
 
-df_predict = df_group[
-    ['原ASIN', '数据更新时间', 'svc_predict_fba', 'decisiontreeclassifier_predict_fba', 'randomforestclassifier_predict_fba',
-     'svc_predict_fbm', 'decisiontreeclassifier_predict_fbm', 'randomforestclassifier_predict_fbm',
-     'randomforestclassifier_predict']]
+    # 机器学习预测
+    for model_name in models.keys():
+        # df_group.insert(loc=0, column='idx', value=df_group.index)
+        df_group[f'{model_name}_predict_fbm'] = model_predict(df_group, model_name)
 
-sql_engine.data_to_sql(df_predict, path.product_group_predict, 'append', config.connet_product_db_sql)
+    # -------------------------------------数据整合入库-----------------------------------------------
+    df_group['randomforestclassifier_predict'] = np.where(df_group['randomforestclassifier_predict_fba'] == 1, 2,
+                                                          df_group['randomforestclassifier_predict_fbm'])
 
-print('done')
+    df_predict = df_group[
+        ['原ASIN', '数据更新时间', 'svc_predict_fba', 'decisiontreeclassifier_predict_fba',
+         'randomforestclassifier_predict_fba',
+         'svc_predict_fbm', 'decisiontreeclassifier_predict_fbm', 'randomforestclassifier_predict_fbm',
+         'randomforestclassifier_predict']]
+
+    sql_engine.data_to_sql(df_predict, path.product_group_predict, 'append', config.connet_product_db_sql)
+
+    print('done')
+
+else:
+    sys.exit()
 
 """
 # 机器学习训练数据准备

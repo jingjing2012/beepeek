@@ -70,7 +70,7 @@ pt_product_table_fbm = r'\\192.168.10.244\数字化选品\直发历史开品提�
 sheet_fbm1 = '直发开品'
 sheet_fbm2 = '直发线索'
 
-position_table_self = r'\\192.168.10.244\数字化选品\精铺定位相似竞品提报\定位相似竞品提报表.xlsx'
+position_table_self = r'\\192.168.10.244\数字化选品\定位相似竞品及自动筛词自主提报\定位相似竞品及自动筛词自主提报表.xlsx'
 sheet_position = 'report_asin'
 pt_clue_asin = 'pt_clue_asin'
 
@@ -132,6 +132,7 @@ competitors_ai = 'competitors_ai'
 position_supplement_competitors = 'supplement_competitors'
 pt_clue_tag = 'pt_clue_tag'
 pt_clue_profit = 'pt_clue_profit'
+pt_clue_kw = 'pt_clue_kw'
 
 # 店铺监控
 # 数据库

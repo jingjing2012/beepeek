@@ -78,6 +78,52 @@ def group_traffic_add_page_sql(group_page_size, group_start_index, group_supplem
     return sql_traffic_add
 
 
+# 关联流量复用
+def group_traffic_status_sql(original_database, new_database, new_status):
+    sql_traffic_status = 'UPDATE ' + new_database + '.pt_product_get_group INNER JOIN ' + original_database + \
+                         '.pt_product_get_group ON ' + new_database + '.pt_product_get_group.asin=' + \
+                         original_database + '.pt_product_get_group.asin SET ' + new_database + \
+                         '.pt_product_get_group.`status`=' + str(new_status) + ' WHERE ' + \
+                         original_database + '.pt_product_get_group.`status`=1'
+    return sql_traffic_status
+
+
+def group_traffic_old_create_sql(original_table, new_table):
+    sql_traffic_old_create = 'CREATE TABLE ' + new_table + ' LIKE ' + original_table
+    return sql_traffic_old_create
+
+
+def group_traffic_old_insert_sql(original_database, new_database, original_table, new_table, new_status):
+    sql_traffic_old_insert = 'INSERT INTO ' + new_database + '.`' + new_table + \
+                             '`(SELECT DISTINCT ' + original_database + '.' + original_table + '.* FROM ' + \
+                             new_database + '.pt_product_get_group INNER JOIN ' + original_database + '.' + \
+                             original_table + ' ON ' + new_database + '.pt_product_get_group.asin = ' + \
+                             original_database + '.' + original_table + '.asin WHERE ' + \
+                             new_database + '.pt_product_get_group.`status`=' + str(new_status) + ')'
+    return sql_traffic_old_insert
+
+
+def kw_ai_match(id_start, id_increment):
+    sql_kw_ai_match = """
+    SELECT DISTINCT
+    	pt_clue_asin.asin,
+    	clue_info.site,
+    	clue_info.image,
+    	clue_info.title 
+    FROM
+    	pt_clue_asin
+    	INNER JOIN clue_info ON pt_clue_asin.asin = clue_info.ASIN 
+    WHERE
+    	pt_clue_asin.clue_status = 1 
+    	AND pt_clue_asin.kw_status = 0 
+    	AND (
+    	LENGTH( clue_info.image )+ LENGTH( clue_info.title ))>0
+    """
+    sql_kw_match = sql_kw_ai_match + ' AND pt_clue_asin.id >=' + str(id_start) + \
+                   ' LIMIT ' + str(id_increment)
+    return sql_kw_match
+
+
 """
 sql_asin = 'select asin as "related_asin",price,recommend,blue_ocean_estimate from ' + path.pt_product_get_group + \
                ' limit ' + str(page_size) + ' offset ' + str(start_index)

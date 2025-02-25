@@ -65,7 +65,7 @@ connet_product_db_sql = 'mysql+pymysql://' + oe_username + ':' + oe_password + '
                         product_database + '?charset=utf8mb4'
 
 # 精铺算法数据源库
-sellersprite_database = 'sellersprite_202501'
+sellersprite_database = 'sellersprite_202502'
 sellersprite_database_old = 'sellersprite_202412'
 sellersprite_hostname = 'rm-8vbodje181md80v052o.mysql.zhangbei.rds.aliyuncs.com'
 sellersprite_port = 3306  # ssh端口

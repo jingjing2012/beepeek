@@ -42,7 +42,7 @@ df_seller_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_pas
 df_brand_self = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
                                               sql.brand_self_sql)
 
-"""
+
 # 线索数据去重
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.duplicate_sql_product_report)
@@ -69,7 +69,7 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
 
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
                            sql.create_index_sql_relevance_2)
-"""
+
 # 参数
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
@@ -354,7 +354,7 @@ while row_start < row_max:
     df_product_tag['评分数分布'] = calculation_util.get_mround(df_product_tag, 'ratings', '评分数分布', 100)
 
     # 6.筛选可供爬取CPC的线索
-    df_product_cpc = df_product.query('推荐度>= 2.0')
+    df_product_cpc = df_product.query('推荐度>= 2.5')
 
     df_product_cpc = df_product_cpc[['ASIN', 'price', '推荐度', '疑似知名品牌', '疑似节日性', '剔除类目']]
 

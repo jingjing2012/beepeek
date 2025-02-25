@@ -1,3 +1,4 @@
+import json
 import sys
 import warnings
 
@@ -131,7 +132,17 @@ cal_util.get_mround(df_competitiors, 'ratings', 'ratings_tag', 100)
 # 开售月数计算
 month_available(df_competitiors)
 
-# --------------------毛利测算----------------------------
+# 字段整理
+df_tag = pd.merge(df_competitiors, df_ai, how='left', on='expand_competitors_id')
+df_tag = df_tag[
+    ['expand_competitors_id', 'competitive_tag', 'similarity_tag', 'price_tag', 'ratings_tag', 'available_months']]
+
+df_tag = duplicate_util.df_cleaning(df_tag, 'expand_competitors_id')
+
+# 数据入库
+sql_engine.data_to_sql(df_tag, path.pt_clue_tag, 'append', config.connet_clue_position_db_sql)
+
+# --------------------------------------------毛利测算---------------------------------------------------
 # 平均价格计算
 df_tag_price = df_competitiors[['data_id', 'expand_competitors_id', 'price']]
 df_product = df_ai.merge(df_tag_price, how='left', on='expand_competitors_id')
@@ -142,111 +153,121 @@ df_price_profit = df_product_profit.groupby(['ASIN', 'site'])['price'].mean().re
 df_profit_product = df_price_profit.merge(df_clue, how='left', on='ASIN')
 df_profit = df_profit_product.query('price * length_max * length_mid * length_min * weight * price_value > 0')
 
-df_profit_us = df_profit.query('site == "us"')
-df_profit_uk = df_profit.query('site == "uk"')
-df_profit_de = df_profit.query('site == "de"')
+if df_profit.empty:
+    print('df_profit.empty')
+else:
+    df_profit_us = df_profit.query('site == "us"')
+    df_profit_uk = df_profit.query('site == "uk"')
+    df_profit_de = df_profit.query('site == "de"')
 
-# 规格数据转换
-df_profit_us[['max_length', 'mid_length', 'min_length', 'weight_pound', 'perimeter', 'weight_max_kg',
-              'weight_max_pound', 'product_fee']] = df_profit_us.apply(lambda row: pd.Series(
-    profit_cal.value_convert_us(row['length_max'], row['length_mid'], row['length_min'], row['weight'],
-                                row['price_value'], para.exchange_rate_us)), axis=1)
+    if df_profit_us.empty:
+        print('df_profit_us.empty')
+    else:
+        # 规格数据转换
+        df_profit_us[['max_length', 'mid_length', 'min_length', 'weight_pound', 'perimeter', 'weight_max_kg',
+                      'weight_max_pound', 'product_fee']] = df_profit_us.apply(lambda row: pd.Series(
+            profit_cal.value_convert_us(row['length_max'], row['length_mid'], row['length_min'], row['weight'],
+                                        row['price_value'], para.exchange_rate_us)), axis=1)
+        # 头程计算
+        df_profit_us[['freight_fee', 'freight_fee_air']] = df_profit_us.apply(lambda row: pd.Series(
+            profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_us, para.freight_air_fee_us,
+                                       para.exchange_rate_us)), axis=1)
+        # 规格打标
+        df_profit_us['size_tag'] = df_profit_us.apply(lambda row: pd.Series(
+            profit_cal.size_tag_us_cal(row['max_length'], row['mid_length'], row['min_length'], row['perimeter'],
+                                       row['weight_max_pound'])), axis=1)
+        # fba费用计算
+        df_profit_us['fba_fee'] = df_profit_us.apply(
+            lambda row: profit_cal.fba_fee_us_cal(row['price'], row['size_tag'], row['weight_pound'],
+                                                  row['weight_max_pound']), axis=1)
+        # 毛利计算
+        df_profit_us[
+            ['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit',
+             'profit_air_rate', 'profit_air']] = df_profit_us.apply(lambda row: pd.Series(
+            profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'],
+                                  row['fba_fee'], para.vat_rate_us)), axis=1)
+        if df_profit_uk.empty:
+            print('df_profit_uk.empty')
+        else:
+            # 规格数据转换
+            df_profit_uk[
+                ['perimeter', 'weight_kg', 'weight_volume_kg', 'weight_max_kg', 'product_fee']] = df_profit_uk.apply(
+                lambda row: pd.Series(
+                    profit_cal.value_convert_ukde(row['length_max'], row['length_mid'], row['length_min'],
+                                                  row['weight'], row['price_value'], para.exchange_rate_uk)), axis=1)
+            # 头程计算
+            df_profit_uk[['freight_fee', 'freight_fee_air']] = df_profit_uk.apply(lambda row: pd.Series(
+                profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_uk, para.freight_air_fee_uk,
+                                           para.exchange_rate_uk)), axis=1)
+            # 规格打标
+            df_profit_uk['size_tag'] = df_profit_uk.apply(lambda row: pd.Series(
+                profit_cal.size_tag_ukde_cal(row['length_max'], row['length_mid'], row['length_min'], row['perimeter'],
+                                             row['weight_kg'], row['weight_volume_kg'])), axis=1)
+            # fba费用计算
+            df_profit_uk['fba_fee'] = df_profit_uk.apply(
+                lambda row: profit_cal.fba_fee_uk_cal(row['price'], row['size_tag'], row['weight_kg'],
+                                                      row['weight_max_kg']), axis=1)
+            # 毛利计算
+            df_profit_uk[
+                ['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate',
+                 'profit',
+                 'profit_air_rate', 'profit_air']] = df_profit_uk.apply(lambda row: pd.Series(
+                profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'],
+                                      row['fba_fee'], para.vat_rate_uk)), axis=1)
 
-df_profit_uk[['perimeter', 'weight_kg', 'weight_volume_kg', 'weight_max_kg', 'product_fee']] = df_profit_uk.apply(
-    lambda row: pd.Series(
-        profit_cal.value_convert_ukde(row['length_max'], row['length_mid'], row['length_min'], row['weight'],
-                                      row['price_value'], para.exchange_rate_uk)), axis=1)
+            if df_profit_de.empty:
+                print('df_profit_de.empty')
+            else:
+                # 规格数据转换
+                df_profit_de[
+                    ['perimeter', 'weight_kg', 'weight_volume_kg', 'weight_max_kg',
+                     'product_fee']] = df_profit_de.apply(
+                    lambda row: pd.Series(
+                        profit_cal.value_convert_ukde(row['length_max'], row['length_mid'], row['length_min'],
+                                                      row['weight'], row['price_value'], para.exchange_rate_de)),
+                    axis=1)
+                # 头程计算
+                df_profit_de[['freight_fee', 'freight_fee_air']] = df_profit_de.apply(lambda row: pd.Series(
+                    profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_de, para.freight_air_fee_de,
+                                               para.exchange_rate_de)), axis=1)
+                # 规格打标
+                df_profit_de['size_tag'] = df_profit_de.apply(lambda row: pd.Series(
+                    profit_cal.size_tag_ukde_cal(row['length_max'], row['length_mid'], row['length_min'],
+                                                 row['perimeter'], row['weight_kg'], row['weight_volume_kg'])), axis=1)
+                # fba费用计算
+                df_profit_de['fba_fee'] = df_profit_de.apply(
+                    lambda row: profit_cal.fba_fee_de_cal(row['price'], row['size_tag'], row['weight_kg'],
+                                                          row['weight_max_kg']), axis=1)
+                # 毛利计算
+                df_profit_de[
+                    ['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate',
+                     'profit', 'profit_air_rate', 'profit_air']] = df_profit_de.apply(lambda row: pd.Series(
+                    profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'],
+                                          row['fba_fee'], para.vat_rate_de)), axis=1)
 
-df_profit_de[['perimeter', 'weight_kg', 'weight_volume_kg', 'weight_max_kg', 'product_fee']] = df_profit_de.apply(
-    lambda row: pd.Series(
-        profit_cal.value_convert_ukde(row['length_max'], row['length_mid'], row['length_min'], row['weight'],
-                                      row['price_value'], para.exchange_rate_de)), axis=1)
+    # 字段整理
+    df_profit = pd.concat([df_profit_us, df_profit_uk, df_profit_de], ignore_index=True)
+    df_profit = df_profit[
+        ['ASIN', 'site', 'price', 'max_length', 'mid_length', 'min_length', 'weight_pound', 'perimeter',
+         'weight_max_kg', 'weight_max_pound', 'product_fee', 'freight_fee', 'freight_fee_air', 'size_tag', 'fba_fee',
+         'product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit',
+         'profit_air_rate', 'profit_air']]
 
-# 头程计算
-df_profit_us[['freight_fee', 'freight_fee_air']] = df_profit_us.apply(lambda row: pd.Series(
-    profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_us, para.freight_air_fee_us,
-                               para.exchange_rate_us)), axis=1)
+    profit_list_2 = ['price', 'max_length', 'mid_length', 'min_length', 'perimeter', 'weight_max_kg',
+                     'weight_max_pound', 'product_fee', 'freight_fee', 'freight_fee_air', 'fba_fee', 'profit',
+                     'profit_air']
+    for m in profit_list_2:
+        clean_util.convert_type(df_profit, m, 2)
 
-df_profit_uk[['freight_fee', 'freight_fee_air']] = df_profit_uk.apply(lambda row: pd.Series(
-    profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_uk, para.freight_air_fee_uk,
-                               para.exchange_rate_uk)), axis=1)
+    profit_list_4 = ['weight_pound', 'product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate',
+                     'profit_rate', 'profit', 'profit_air_rate']
+    for n in profit_list_4:
+        clean_util.convert_type(df_profit, n, 4)
 
-df_profit_de[['freight_fee', 'freight_fee_air']] = df_profit_de.apply(lambda row: pd.Series(
-    profit_cal.freight_fee_cal(row['weight_max_kg'], para.freight_fee_de, para.freight_air_fee_de,
-                               para.exchange_rate_de)), axis=1)
+    # 数据入库
+    sql_engine.data_to_sql(df_profit, path.pt_clue_profit, 'append', config.connet_clue_position_db_sql)
 
-# 规格打标
-df_profit_us['size_tag'] = df_profit_us.apply(lambda row: pd.Series(
-    profit_cal.size_tag_us_cal(row['max_length'], row['mid_length'], row['min_length'], row['perimeter'],
-                               row['weight_max_pound'])), axis=1)
-
-df_profit_uk['size_tag'] = df_profit_uk.apply(lambda row: pd.Series(
-    profit_cal.size_tag_ukde_cal(row['length_max'], row['length_mid'], row['length_min'], row['perimeter'],
-                                 row['weight_kg'], row['weight_volume_kg'])), axis=1)
-
-df_profit_de['size_tag'] = df_profit_de.apply(lambda row: pd.Series(
-    profit_cal.size_tag_ukde_cal(row['length_max'], row['length_mid'], row['length_min'], row['perimeter'],
-                                 row['weight_kg'], row['weight_volume_kg'])), axis=1)
-# fba费用计算
-df_profit_us['fba_fee'] = df_profit_us.apply(
-    lambda row: profit_cal.fba_fee_us_cal(row['price'], row['size_tag'], row['weight_pound'], row['weight_max_pound']),
-    axis=1)
-
-df_profit_uk['fba_fee'] = df_profit_uk.apply(
-    lambda row: profit_cal.fba_fee_uk_cal(row['price'], row['size_tag'], row['weight_kg'], row['weight_max_kg']),
-    axis=1)
-
-df_profit_de['fba_fee'] = df_profit_de.apply(
-    lambda row: profit_cal.fba_fee_de_cal(row['price'], row['size_tag'], row['weight_kg'], row['weight_max_kg']),
-    axis=1)
-
-# 毛利计算
-df_profit_us[['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit',
-              'profit_air_rate', 'profit_air']] = df_profit_us.apply(lambda row: pd.Series(
-    profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'], row['fba_fee'],
-                          para.vat_rate_us)), axis=1)
-
-df_profit_uk[['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit',
-              'profit_air_rate', 'profit_air']] = df_profit_uk.apply(lambda row: pd.Series(
-    profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'], row['fba_fee'],
-                          para.vat_rate_uk)), axis=1)
-
-df_profit_de[['product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit',
-              'profit_air_rate', 'profit_air']] = df_profit_de.apply(lambda row: pd.Series(
-    profit_cal.profit_cal(row['price'], row['product_fee'], row['freight_fee'], row['freight_fee_air'], row['fba_fee'],
-                          para.vat_rate_de)), axis=1)
-
-# --------------------毛利测算----------------------------
-
-# 字段整理
-df_tag = pd.merge(df_competitiors, df_ai, how='left', on='expand_competitors_id')
-df_tag = df_tag[
-    ['expand_competitors_id', 'competitive_tag', 'similarity_tag', 'price_tag', 'ratings_tag', 'available_months']]
-
-df_tag = duplicate_util.df_cleaning(df_tag, 'expand_competitors_id')
-
-df_profit = pd.concat([df_profit_us, df_profit_uk, df_profit_de], ignore_index=True)
-df_profit = df_profit[
-    ['ASIN', 'site', 'price', 'max_length', 'mid_length', 'min_length', 'weight_pound', 'perimeter', 'weight_max_kg',
-     'weight_max_pound', 'product_fee', 'freight_fee', 'freight_fee_air', 'size_tag', 'fba_fee', 'product_fee_rate',
-     'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate', 'profit_rate', 'profit', 'profit_air_rate',
-     'profit_air']]
-
-profit_list_2 = ['price', 'max_length', 'mid_length', 'min_length', 'perimeter', 'weight_max_kg', 'weight_max_pound',
-                 'product_fee', 'freight_fee', 'freight_fee_air', 'fba_fee', 'profit', 'profit_air']
-for m in profit_list_2:
-    clean_util.convert_type(df_profit, m, 2)
-
-profit_list_4 = ['weight_pound', 'product_fee_rate', 'freight_fee_rate', 'freight_fee_air_rate', 'fba_fee_rate',
-                 'profit_rate', 'profit', 'profit_air_rate']
-for n in profit_list_4:
-    clean_util.convert_type(df_profit, n, 4)
-
-# 数据入库
-sql_engine.data_to_sql(df_tag, path.pt_clue_tag, 'append', config.connet_clue_position_db_sql)
-sql_engine.data_to_sql(df_profit, path.pt_clue_profit, 'append', config.connet_clue_position_db_sql)
-
-# 状态更新
+# ----------------------------------------------状态更新----------------------------------------------
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password,
                            config.clue_position_database, sql.update_position_sql1)
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password,
