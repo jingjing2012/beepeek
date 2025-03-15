@@ -1068,7 +1068,13 @@ follow_fbm_score = 0.5  # FBM配送方式加分
 
 # 自动筛词API调用
 api_url = 'http://coarse-screen.qingkula.com/full_search/'
+# api_url = "http://8.221.112.114:9999/full_search/"
 headers = {
-            'Content-Type': 'application/json',
-            # 'Authorization': f'Bearer {API_KEY}'  # 如果需要认证
-        }
+    'Content-Type': 'application/json',
+    # 'Authorization': f'Bearer {API_KEY}'  # 如果需要认证
+}
+
+proxies = {
+    "http": "http://8.221.112.114:9999",  # HTTP 代理
+    "https": "http://8.221.112.114:9999"  # HTTPS 代理
+}

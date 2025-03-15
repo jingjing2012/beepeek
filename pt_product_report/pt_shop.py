@@ -330,4 +330,13 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
                            sql.update_seller_product_sql)
 
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_variation_sql)
+
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_status_sql)
+
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_sale_status_sql)
+
 print('done')

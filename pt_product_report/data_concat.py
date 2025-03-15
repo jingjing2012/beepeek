@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 # 获取文件夹中所有 Excel 文件
-folder_path = r"C:\Users\Administrator\Desktop\五点描述_关键词筛选_直发2"
+folder_path = r"C:\Users\Administrator\Desktop\20250228"
 files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx') or f.endswith('.xls')]
 
 # 存储所有合并的数据
@@ -24,6 +24,6 @@ for file in files:
 final_df = pd.concat(combined_data, ignore_index=True)
 
 # 保存到一个新的 Excel 文件
-final_df.to_excel(os.path.join(folder_path, r"C:\Users\Administrator\Desktop\五点描述_关键词筛选_直发2.xlsx"), index=False)
+final_df.to_excel(os.path.join(folder_path, r"C:\Users\Administrator\Desktop\20250228.xlsx"), index=False)
 
 print("合并完成！")

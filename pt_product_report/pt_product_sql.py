@@ -94,7 +94,7 @@ sql_get_duplicate = 'select * from ' + path.pt_product_duplicate
 
 sql_relevance_asins = 'select * from ' + path.pt_relevance_asins
 
-sql_group_predict = 'select * from ' + path.product_group_predict + 'WHERE `数据更新时间`="' + update_date
+sql_group_predict = 'select * from ' + path.product_group_predict + ' WHERE `数据更新时间`="' + update_date + '"'
 
 # group表
 
@@ -588,19 +588,36 @@ sampling_knn_group_sql = 'SELECT * FROM product_group_history WHERE `数据更�
 sampling_group_sql = 'SELECT * FROM product_group_history WHERE `数据更新时间`="' + update_date + '" AND `有销额竞品款数`>=5'
 
 # 竞品提报查重
-sql_position_competitior = 'SELECT CONCAT(' + path.expand_competitors + '.ASIN," | ",' + path.expand_competitors + \
-                           '.site) AS data_id,' + path.expand_competitors + '.id AS expand_competitors_id,' + \
-                           'supplement_competitors.* FROM ' + path.expand_competitors + \
-                           ' LEFT JOIN supplement_competitors ON ' + path.expand_competitors + '.associate_asin = ' + \
-                           'supplement_competitors.asin AND ' + path.expand_competitors + '.site=' + \
-                           'supplement_competitors.site WHERE supplement_competitors.id>0 and ' \
-                           + path.expand_competitors + '.tag_status=0'
+sql_position_ai_jude = 'SELECT * FROM expand_competitors WHERE ai_status=0'
 
-sql_position_ai = 'SELECT ' + path.expand_competitors + '.id AS expand_competitors_id,' + path.expand_competitors + \
-                  '.ASIN,' + path.expand_competitors + '.site,' + path.competitors_ai + '.similarity_score,' \
-                  + path.competitors_ai + '.overall_competitiveness FROM ' + path.expand_competitors + ' LEFT JOIN ' \
-                  + path.competitors_ai + ' ON ' + path.expand_competitors + '.id = ' + path.competitors_ai + \
-                  '.parent_id WHERE ' + path.competitors_ai + '.id>0 and ' + path.expand_competitors + '.tag_status=0'
+sql_position_competitior = """
+SELECT
+	CONCAT( expand_competitors.ASIN, " | ", expand_competitors.site ) AS data_id,
+	expand_competitors.id AS expand_competitors_id,
+	supplement_competitors.* 
+FROM
+	expand_competitors
+	LEFT JOIN supplement_competitors ON expand_competitors.associate_asin = supplement_competitors.asin 
+	AND expand_competitors.site = supplement_competitors.site 
+WHERE
+	supplement_competitors.id > 0 
+	AND expand_competitors.tag_status =0
+"""
+
+sql_position_ai = """
+SELECT
+	expand_competitors.id AS expand_competitors_id,
+	expand_competitors.ASIN,
+	expand_competitors.site,
+	competitors_ai.similarity_score,
+	competitors_ai.overall_competitiveness 
+FROM
+	expand_competitors
+	LEFT JOIN competitors_ai ON expand_competitors.id = competitors_ai.parent_id 
+WHERE
+	competitors_ai.id > 0 
+	AND expand_competitors.tag_status =0
+"""
 
 update_position_sql1 = 'UPDATE ' + path.expand_competitors + ' SET tag_status=1 WHERE id IN' \
                                                              '(SELECT expand_competitors_id FROM pt_clue_tag)'
@@ -612,8 +629,8 @@ update_position_sql3 = 'UPDATE ' + path.expand_competitors + ' SET profit_status
 
 update_position_sql4 = 'UPDATE ' + path.pt_clue_asin + ' SET kw_status=1 WHERE asin IN (SELECT asin FROM pt_clue_kw)'
 
-# sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin where clue_status=1'
-sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin'
+sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin where clue_status=1'
+# sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin'
 # 店铺挖掘
 sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE brand_status + seller_status = 2'
 
@@ -692,35 +709,111 @@ WHERE
 """
 
 # 状态码更新
-sql_report_brand_status = 'UPDATE pt_sellers_product INNER JOIN pt_brand_insight ON ' \
-                          'pt_sellers_product.task_tag=pt_brand_insight.task_tag AND ' \
-                          'pt_sellers_product.brand=pt_brand_insight.`name` SET ' \
-                          'pt_sellers_product.brand_status=1 WHERE pt_brand_insight.`status`=1 ' \
-                          'AND pt_sellers_product.brand_status=0;'
+sql_report_brand_status = """
+UPDATE pt_sellers_product
+INNER JOIN pt_brand_insight ON pt_sellers_product.task_tag = pt_brand_insight.task_tag 
+AND pt_sellers_product.brand = pt_brand_insight.`name` 
+SET pt_sellers_product.brand_status = 1 
+WHERE
+	pt_brand_insight.`status` = 1 
+	AND pt_sellers_product.brand_status = 0;
+"""
 
-sql_report_seller_status = 'UPDATE pt_sellers_product INNER JOIN pt_sellers_insight ON ' \
-                           'pt_sellers_product.task_tag=pt_sellers_insight.task_tag AND ' \
-                           'pt_sellers_product.buybox_seller=pt_sellers_insight.`name` SET ' \
-                           'pt_sellers_product.seller_status=1 WHERE pt_sellers_insight.`status`=1 ' \
-                           'AND pt_sellers_product.seller_status=0;'
+sql_report_seller_status = """
+UPDATE pt_sellers_product
+INNER JOIN pt_sellers_insight ON pt_sellers_product.task_tag = pt_sellers_insight.task_tag 
+AND pt_sellers_product.buybox_seller = pt_sellers_insight.`name` 
+SET pt_sellers_product.seller_status = 1 
+WHERE
+	pt_sellers_insight.`status` = 1 
+	AND pt_sellers_product.seller_status = 0;
+"""
 
-sql_seller_brand_status = 'UPDATE pt_brand_competing_report INNER JOIN pt_brand_insight ON ' \
-                          'pt_brand_competing_report.task_tag=pt_brand_insight.task_tag AND ' \
-                          'pt_brand_competing_report.brand=pt_brand_insight.`name` SET ' \
-                          'pt_brand_competing_report.brand_status=1 WHERE pt_brand_insight.`status`=1 ' \
-                          'AND pt_brand_competing_report.brand_status=0;'
+sql_seller_brand_status = """
+UPDATE pt_brand_competing_report
+INNER JOIN pt_brand_insight ON pt_brand_competing_report.task_tag = pt_brand_insight.task_tag 
+AND pt_brand_competing_report.brand = pt_brand_insight.`name` 
+SET pt_brand_competing_report.brand_status = 1 
+WHERE
+	pt_brand_insight.`status` = 1 
+	AND pt_brand_competing_report.brand_status = 0;
+"""
 
-sql_seller_seller_status = 'UPDATE pt_brand_competing_report INNER JOIN pt_sellers_insight ON ' \
-                           'pt_brand_competing_report.task_tag=pt_sellers_insight.task_tag AND ' \
-                           'pt_brand_competing_report.buybox_seller=pt_sellers_insight.`name` SET ' \
-                           'pt_brand_competing_report.seller_status=1 WHERE pt_sellers_insight.`status`=1 ' \
-                           'AND pt_brand_competing_report.seller_status=0;'
+sql_seller_seller_status = """
+UPDATE pt_brand_competing_report
+INNER JOIN pt_sellers_insight ON pt_brand_competing_report.task_tag = pt_sellers_insight.task_tag 
+AND pt_brand_competing_report.buybox_seller = pt_sellers_insight.`name` 
+SET pt_brand_competing_report.seller_status = 1 
+WHERE
+	pt_sellers_insight.`status` = 1 
+	AND pt_brand_competing_report.seller_status = 0;
+"""
 
-update_brand_report_sql = 'UPDATE ' + path.pt_brand_competing_report + \
-                          ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
+update_brand_report_sql = """
+UPDATE pt_brand_competing_report 
+SET brand_status = 2,
+seller_status = 2 
+WHERE
+	brand_status + seller_status = 2
+"""
 
-update_seller_product_sql = 'UPDATE ' + path.pt_sellers_product + \
-                            ' SET brand_status =2, seller_status = 2 WHERE brand_status + seller_status = 2'
+update_seller_product_sql = """
+UPDATE pt_sellers_product 
+SET brand_status = 2,
+seller_status = 2 
+WHERE
+	brand_status + seller_status = 2
+"""
+
+update_seller_product_variation_sql = """
+UPDATE pt_sellers_product_follow
+INNER JOIN (
+	SELECT
+		id,
+		ROW_NUMBER() over ( PARTITION BY parent, buybox_seller_id ORDER BY follow_score DESC ) "follow_rank" 
+	FROM
+		(
+		SELECT DISTINCT
+			pt_sellers_product_follow.id,
+			pt_sellers_product_follow.buybox_seller_id,
+			pt_sellers_product_follow.asin,
+			pt_sellers_product_follow.follow_score,
+			pt_sellers_product.parent 
+		FROM
+			pt_sellers_product_follow
+			INNER JOIN pt_sellers_product ON pt_sellers_product_follow.asin = pt_sellers_product.asin 
+		WHERE
+			pt_sellers_product.parent IS NOT NULL 
+		ORDER BY
+			pt_sellers_product.parent 
+		) a 
+	) b ON pt_sellers_product_follow.id = b.id 
+	SET pt_sellers_product_follow.variation_rank = b.follow_rank
+"""
+
+update_seller_product_status_sql = """
+UPDATE pt_sellers_product_follow SET `status` =-1 WHERE variation_rank>2
+"""
+
+update_seller_product_sale_status_sql = """
+UPDATE pt_sellers_product_follow SET sale_status=-10 WHERE variation_rank>2
+"""
+
+update_seller_product_unavailable_sql = """
+UPDATE pt_sellers_product_follow
+INNER JOIN pt_follow_no_sales ON pt_sellers_product_follow.asin = pt_follow_no_sales.asin 
+SET sale_status = 0 
+WHERE
+	pt_sellers_product_follow.`status` = 0
+"""
+
+update_seller_product_sales_sql = """
+UPDATE pt_sellers_product_follow
+INNER JOIN pt_follow_no_sales ON pt_sellers_product_follow.asin = pt_follow_no_sales.asin 
+SET pt_sellers_product_follow.`status` = 2 
+WHERE
+	pt_sellers_product_follow.sale_status = 1
+"""
 
 sql_shop_follow = """
 SELECT DISTINCT
@@ -731,5 +824,5 @@ FROM
 	pt_sellers_product_follow
 	INNER JOIN pt_sellers_product ON pt_sellers_product_follow.asin = pt_sellers_product.asin 
 WHERE
-	pt_sellers_product_follow.currently_unavailable_status =1 AND `status`=1
+	pt_sellers_product_follow.currently_unavailable_status =1 AND `status`=2
 """

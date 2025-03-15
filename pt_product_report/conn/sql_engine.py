@@ -2,7 +2,7 @@ import pandas as pd
 import pymysql
 import mysql.connector
 from sqlalchemy import create_engine
-from better.conn import mysql_config as config
+from . import mysql_config as config  # 适用于相对导入
 
 
 # 数据连接

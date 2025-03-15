@@ -83,6 +83,13 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
 
+df_ai_jude = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                           config.clue_position_database, sql.sql_position_ai_jude)
+
+if not df_ai_jude.empty:
+    print('ai is running')
+    sys.exit()
+
 # 数据连接
 df_competitior = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                                config.clue_position_database, sql.sql_position_competitior)
@@ -96,7 +103,8 @@ if df_competitior.empty:
     sys.exit()
 
 # 数据格式清洗
-df_competitiors = df_competitior[['data_id', 'expand_competitors_id', 'asin', 'price', 'ratings', 'date_available']]
+df_competitiors = df_competitior[
+    ['data_id', 'expand_competitors_id', 'asin', 'price', 'sales', 'ratings', 'date_available']]
 
 clean_util.convert_type(df_competitiors, 'price', 2)
 clean_util.convert_type(df_competitiors, 'ratings', 0)
@@ -124,7 +132,7 @@ df_competitiors = pd.merge(df_competitiors, df_price_tag, how='left', on=['data_
 # 竞争力分组
 df_ai['competitive_tag'] = common_util.get_cut(df_ai, 'overall_competitiveness', [-99, -0.5, 0.5, 1, 99],
                                                ['软柿子', '实力相当', '慎重选择', '硬茬'])
-df_ai['similarity_tag'] = common_util.get_cut(df_ai, 'similarity_score', [0, 4, 7, 10], ['低相似', '中等相似', '高相似'])
+df_ai['similarity_tag'] = common_util.get_cut(df_ai, 'similarity_score', [-99, 4, 7, 99], ['低相似', '中等相似', '高相似'])
 
 # 星数分级
 cal_util.get_mround(df_competitiors, 'ratings', 'ratings_tag', 100)
@@ -144,7 +152,8 @@ sql_engine.data_to_sql(df_tag, path.pt_clue_tag, 'append', config.connet_clue_po
 
 # --------------------------------------------毛利测算---------------------------------------------------
 # 平均价格计算
-df_tag_price = df_competitiors[['data_id', 'expand_competitors_id', 'price']]
+competitiors_df = df_competitiors.query('sales > 0')
+df_tag_price = competitiors_df[['data_id', 'expand_competitors_id', 'price']]
 df_product = df_ai.merge(df_tag_price, how='left', on='expand_competitors_id')
 df_product_profit = df_product.query('similarity_tag == "高相似"')
 df_price_profit = df_product_profit.groupby(['ASIN', 'site'])['price'].mean().reset_index()

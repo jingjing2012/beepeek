@@ -45,6 +45,10 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="pandas.io.sql"
 warnings.filterwarnings("ignore", category=UserWarning, module='pandas')
 warnings.filterwarnings("ignore", message="pandas only support SQLAlchemy connectable.*")
 
+# 店铺挖掘不可售判断状态更新
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_unavailable_sql)
+
 # ---------------------------------------数据读取---------------------------------------
 
 # beepeek自主提报
@@ -165,8 +169,14 @@ sql_engine.data_to_sql(df_clue_fbm, data_path.product_clue_fbm, "append", config
 # 竞品提报数据入库
 sql_engine.data_to_sql(df_clue_position, data_path.pt_clue_asin, "append", config.connet_clue_position_db_sql)
 
+# ---------------------------------------店铺挖掘---------------------------------------
+
 # 店铺挖掘提报数据入库
 sql_engine.data_to_sql(df_clue_shop, data_path.pt_seed_asin, "append", config.connet_clue_shop_db_sql)
+
+# 店铺挖掘销量判断状态更新
+sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
+                           sql.update_seller_product_sales_sql)
 
 # 店铺挖掘可跟卖线索知产速筛
 df_shop_follow = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
