@@ -1,19 +1,21 @@
-import json
 import sys
 import warnings
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from datetime import datetime
 from sklearn.exceptions import ConvergenceWarning
 
-from conn import mysql_config as config, sql_engine
-from util import data_cleaning_util as clean_util, common_util, calculation_util as cal_util, duplicate_util
-import pt_product_sql as sql
-import pt_product_report_path as path
-import pt_product_report_parameter as para
+import calculation_util as cal_util
+import common_util
+import data_cleaning_util as clean_util
+import duplicate_util
 import profit_cal
+import pt_product_report_parameter as para
+import pt_product_report_path as path
+import pt_product_sql as sql
+from conn import mysql_config as config, sql_engine
 
 
 def price_st(df, group_col, price_col):
@@ -150,6 +152,9 @@ df_tag = duplicate_util.df_cleaning(df_tag, 'expand_competitors_id')
 # 数据入库
 sql_engine.data_to_sql(df_tag, path.pt_clue_tag, 'append', config.connet_clue_position_db_sql)
 
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_position_database, sql.update_price_tag_sql)
+
 # --------------------------------------------毛利测算---------------------------------------------------
 # 平均价格计算
 competitiors_df = df_competitiors.query('sales > 0')
@@ -277,9 +282,9 @@ else:
     sql_engine.data_to_sql(df_profit, path.pt_clue_profit, 'append', config.connet_clue_position_db_sql)
 
 # ----------------------------------------------状态更新----------------------------------------------
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password,
-                           config.clue_position_database, sql.update_position_sql1)
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password,
-                           config.clue_position_database, sql.update_position_sql2)
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password,
-                           config.clue_position_database, sql.update_position_sql3)
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_position_database, sql.update_position_sql1)
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_position_database, sql.update_position_sql2)
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_position_database, sql.update_position_sql3)

@@ -13,6 +13,19 @@ pre_fees_rate = 0.1  # 默认头程费用占比
 product_fees_rate = 0.25  # 默认货值费用占比
 referral_fees_rate = 0.15  # 默认佣金占比
 
+# 预估货值占比
+product_price_list = [0, 6, 10, 15, 30, 50, 100, 200, 9999]
+product_fees_list = [0.08, 0.1, 0.15, 0.2, 0.25, 0.27, 0.3, 0.35]
+
+# VAT
+vat_us = 0
+vat_uk = 0.16
+vat_de = 0.18
+
+# 汇率
+exchange_us_uk = 0.79
+exchange_us_de = 0.95
+
 gross_rate_upper = 0.5  # 毛利率上限
 gross_rate_lower = -0.5  # 毛利率下限
 
@@ -22,6 +35,10 @@ lqs_std = 7.5  # LQS基准=7.5
 available_std = 6  # 长期上架基准=6
 qa_std = 1  # 基准月均QA数 = 1
 revenue_month_C = 4  # C级基准冒出所需月数=4
+
+custom_kw = ['custom', 'personalize', 'personalized', 'custom-made', 'customized', 'made-to-order']
+
+recommend_weights = np.array([0, 0.25, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0.5])
 
 # --------------------------------蓝海度计算--------------------------------
 
@@ -277,9 +294,14 @@ replace_weight_error_dict = {'maximum weight: ': '',
                              'oz': ' ounces',
                              '千克': ' kg',
                              '公斤': ' kg',
+                             'kilogrammes': ' kg',
+                             'Kilogramm': ' kg',
+                             'Kilograms': ' kg',
                              'kilo gramsrams gramsrams': ' kg',
                              'kilo gramsrams': ' kg',
-                             'kilograms': ' kg',
+                             'grammes': ' g',
+                             'gramm': ' g',
+                             'grams': ' g',
                              'gramsrams': ' g',
                              'gramsram': ' g',
                              'kg': ' kg',
@@ -287,10 +309,11 @@ replace_weight_error_dict = {'maximum weight: ': '',
                              '克': ' g',
                              'g$': ' g',
                              '毫克': ' mg',
+                             'milligrammes': 'mg',
+                             'milligramm': 'mg',
                              'milligrams': 'mg',
                              'milligram': 'mg',
                              'milli$': ' mg',
-                             'grams': ' g',
                              'gram': ' g',
                              'item model number ': '',
                              'department ': '',

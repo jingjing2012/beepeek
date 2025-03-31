@@ -1,13 +1,13 @@
-import sys
-
-from sklearn.cluster import KMeans
-import pandas as pd
 import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
 
-from conn import sql_engine, mysql_config as config
-from util import data_cleaning_util, duplicate_util
+import data_cleaning_util
+import duplicate_util
 import pt_product_report_path as path
 import pt_product_sql as sql
+import db_util
+from conn import sql_engine, mysql_config as config
 
 
 def tag_st(df, group_col, tag_col):
@@ -59,121 +59,136 @@ def tag_tag_rank(tag, tag_col):
 
 # -------------------------------------beepeek数据去重打标-------------------------------------
 
-df_get_group = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                             config.sellersprite_database, sql.sql_get_group)
-df_get_group_status = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                    config.sellersprite_database, sql.sql_get_group_status)
+sites = ['us', 'uk', 'de', 'fr']
 
-if df_get_group_status.empty and (not df_get_group.empty):
+for site in sites:
 
-    # 价格打标
-    df_clue_self = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                 config.clue_self_database, sql.sql_clue_self)
+    sellersprite_database = config.sellersprite_database + '_' + str(site)
 
-    df_group = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                             config.sellersprite_database, sql.sql_group)
+    df_get_group = sql_engine.connect_pt_product(
+        config.sellersprite_hostname, config.sellersprite_password, sellersprite_database, sql.sql_get_group
+    )
 
-    # 对价格进行打标
-    df_price = df_group[['sub_category', 'price']]
-    df_price_st = tag_st(df_price, 'sub_category', 'price')
+    df_get_group_status = sql_engine.connect_pt_product(
+        config.sellersprite_hostname, config.sellersprite_password, sellersprite_database, sql.sql_get_group_status
+    )
 
-    df_price_list = df_price_st['price'].groupby(df_price_st['sub_category']).apply(
-        lambda x: tag_k_means(x)).reset_index()
-    df_price_list.columns = ['sub_category', 'price_list']
+    print(site)
 
-    df_price_tag_list = df_price.merge(df_price_list)
-    df_price_tag_list['price_tag_rank'] = df_price_tag_list.apply(
-        lambda row: pd.Series(tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
+    if df_get_group_status.empty and (not df_get_group.empty):
 
-    # 对FBA费用进行打标
-    df_fba_fees = df_group[['sub_category', 'fba_fees']]
-    df_fba_fees_st = tag_st(df_fba_fees, 'sub_category', 'fba_fees')
+        # 价格打标
+        df_clue_self = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                                     config.clue_self_database, sql.sql_clue_self)
 
-    df_fba_fees_list = df_fba_fees_st['fba_fees'].groupby(df_fba_fees_st['sub_category']).apply(
-        lambda x: tag_k_means(x)).reset_index()
-    df_fba_fees_list.columns = ['sub_category', 'fba_fees_list']
+        df_group = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
+                                                 sellersprite_database, sql.sql_group)
 
-    df_fba_fees_tag_list = df_fba_fees.merge(df_fba_fees_list)
-    df_fba_fees_tag_list['fba_fees_tag_rank'] = df_fba_fees_tag_list.apply(
-        lambda row: pd.Series(tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(drop=True)
+        # 对价格进行打标
+        df_price = df_group[['sub_category', 'price']]
+        df_price_st = tag_st(df_price, 'sub_category', 'price')
 
-    # 重复度计算
-    df_tag = df_group.merge(df_price_tag_list, how='left', on=['sub_category', 'price'])
-    df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
+        df_price_list = df_price_st['price'].groupby(df_price_st['sub_category']).apply(
+            lambda x: tag_k_means(x)).reset_index()
+        df_price_list.columns = ['sub_category', 'price_list']
 
-    df_tag = df_tag.merge(df_fba_fees_tag_list, how='left', on=['sub_category', 'fba_fees'])
-    df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
+        df_price_tag_list = df_price.merge(df_price_list)
+        df_price_tag_list['price_tag_rank'] = df_price_tag_list.apply(
+            lambda row: pd.Series(tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
 
-    # 将 NaN 替换为 None（MySQL 中的 NULL）
-    df_tag = df_tag.fillna(value={
-        'price_list': '[]',  # 将 NaN 替换为空列表的字符串
-        'price_tag_rank': 1,  # 替换为默认值 1
-        'fba_fees_list': '[]',  # 将 NaN 替换为空列表的字符串
-        'fba_fees_tag_rank': 1  # 替换为默认值 1
-    })
+        # 对FBA费用进行打标
+        df_fba_fees = df_group[['sub_category', 'fba_fees']]
+        df_fba_fees_st = tag_st(df_fba_fees, 'sub_category', 'fba_fees')
 
-    tag_kmeans_list = ['price_list', 'fba_fees_list']
-    for tag_kmeans in tag_kmeans_list:
-        data_cleaning_util.convert_str(df_tag, tag_kmeans)
+        df_fba_fees_list = df_fba_fees_st['fba_fees'].groupby(df_fba_fees_st['sub_category']).apply(
+            lambda x: tag_k_means(x)).reset_index()
+        df_fba_fees_list.columns = ['sub_category', 'fba_fees_list']
 
-    df_tag['rank'] = \
-        df_tag.groupby(['sub_category', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank'])[
-            'blue_ocean_estimate'].rank(ascending=False, method='dense')
-    df_tag['rank'] = df_tag['rank'].round(0)
+        df_fba_fees_tag_list = df_fba_fees.merge(df_fba_fees_list)
+        df_fba_fees_tag_list['fba_fees_tag_rank'] = df_fba_fees_tag_list.apply(
+            lambda row: pd.Series(tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(drop=True)
 
-    df_tag['duplicate_tag'] = np.where(df_tag['rank'] <= 10, df_tag['rank'], '10+')
+        # 重复度计算
+        df_tag = df_group.merge(df_price_tag_list, how='left', on=['sub_category', 'price'])
+        df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
 
-    duplicate_tag_conditions = (df_tag['sub_category'].str.len() >= 1) & (df_tag['price_list'].str.len() >= 1) & (
-            df_tag['fba_fees_list'].str.len() >= 1)
+        df_tag = df_tag.merge(df_fba_fees_tag_list, how='left', on=['sub_category', 'fba_fees'])
+        df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
 
-    df_tag['duplicate_tag'] = np.where(duplicate_tag_conditions, df_tag['duplicate_tag'], '0')
+        # 将 NaN 替换为 None（MySQL 中的 NULL）
+        df_tag = df_tag.fillna(value={
+            'price_list': '[]',  # 将 NaN 替换为空列表的字符串
+            'price_tag_rank': 1,  # 替换为默认值 1
+            'fba_fees_list': '[]',  # 将 NaN 替换为空列表的字符串
+            'fba_fees_tag_rank': 1  # 替换为默认值 1
+        })
 
-    # 重复类型打标
-    df_clue_price_tag_list = df_clue_self.merge(df_price_list, on='sub_category').merge(df_fba_fees_list,
-                                                                                        on='sub_category')
+        tag_kmeans_list = ['price_list', 'fba_fees_list']
+        for tag_kmeans in tag_kmeans_list:
+            data_cleaning_util.convert_str(df_tag, tag_kmeans)
 
-    df_clue_price_tag_list['price_tag_rank'] = df_clue_price_tag_list.apply(
-        lambda row: pd.Series(tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
+        df_tag['rank'] = \
+            df_tag.groupby(['sub_category', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank'])[
+                'blue_ocean_estimate'].rank(ascending=False, method='dense')
+        df_tag['rank'] = df_tag['rank'].round(0)
 
-    df_clue_price_tag_list['fba_fees_tag_rank'] = df_clue_price_tag_list.apply(
-        lambda row: pd.Series(tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(drop=True)
+        df_tag['duplicate_tag'] = np.where(df_tag['rank'] <= 10, df_tag['rank'], '10+')
 
-    for tag_kmeans in tag_kmeans_list:
-        data_cleaning_util.convert_str(df_clue_price_tag_list, tag_kmeans)
+        duplicate_tag_conditions = (df_tag['sub_category'].str.len() >= 1) & (df_tag['price_list'].str.len() >= 1) & (
+                df_tag['fba_fees_list'].str.len() >= 1)
 
-    df_tag = df_tag.merge(df_clue_price_tag_list, how='left',
-                          on=['sub_category', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank'])
+        df_tag['duplicate_tag'] = np.where(duplicate_tag_conditions, df_tag['duplicate_tag'], '0')
 
-    df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
+        # 重复类型打标
+        df_clue_price_tag_list = df_clue_self.merge(df_price_list, on='sub_category').merge(df_fba_fees_list,
+                                                                                            on='sub_category')
 
-    df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "0", 0, df_tag['duplicate_type'])
-    df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "10+", 1, df_tag['duplicate_type'])
+        df_clue_price_tag_list['price_tag_rank'] = df_clue_price_tag_list.apply(
+            lambda row: pd.Series(tag_tag_rank(row['price'], row['price_list'])), axis=1).reset_index(drop=True)
 
-    df_duplicate = df_tag[
-        ['asin', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank', 'rank', 'duplicate_tag',
-         'duplicate_type']]
+        df_clue_price_tag_list['fba_fees_tag_rank'] = df_clue_price_tag_list.apply(
+            lambda row: pd.Series(tag_tag_rank(row['fba_fees'], row['fba_fees_list'])), axis=1).reset_index(drop=True)
 
-    tag_list = ['price_tag_rank', 'fba_fees_tag_rank', 'rank', 'duplicate_type']
-    for tag in tag_list:
-        data_cleaning_util.convert_type(df_duplicate, tag, 0)
+        for tag_kmeans in tag_kmeans_list:
+            data_cleaning_util.convert_str(df_clue_price_tag_list, tag_kmeans)
 
-    # 将 NaN 替换为 None（MySQL 中的 NULL）
-    df_duplicate = df_duplicate.fillna(value={
-        'duplicate_tag': 1,
-        'duplicate_type': 0
-    })
+        df_tag = df_tag.merge(df_clue_price_tag_list, how='left',
+                              on=['sub_category', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank'])
 
-    df_duplicate = duplicate_util.df_cleaning(df_duplicate, 'asin')
+        df_tag = duplicate_util.df_cleaning(df_tag, 'asin')
 
-    print('well')
-    # 数据入库
-    sql_engine.data_to_sql(df_duplicate, path.pt_product_duplicate, 'append', config.connet_sellersprite_db_sql)
-    # 状态更新
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               sql.sql_duplicate_update)
+        df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "0", 0, df_tag['duplicate_type'])
+        df_tag['duplicate_type'] = np.where(df_tag['duplicate_tag'] == "10+", 1, df_tag['duplicate_type'])
 
-    print('done')
+        df_duplicate = df_tag[
+            ['asin', 'price_list', 'price_tag_rank', 'fba_fees_list', 'fba_fees_tag_rank', 'rank', 'duplicate_tag',
+             'duplicate_type']]
 
+        tag_list = ['price_tag_rank', 'fba_fees_tag_rank', 'rank', 'duplicate_type']
+        for tag in tag_list:
+            data_cleaning_util.convert_type(df_duplicate, tag, 0)
 
-else:
-    sys.exit()
+        # 将 NaN 替换为 None（MySQL 中的 NULL）
+        df_duplicate = df_duplicate.fillna(value={
+            'duplicate_tag': 1,
+            'duplicate_type': 0
+        })
+
+        df_duplicate = duplicate_util.df_cleaning(df_duplicate, 'asin')
+
+        print('well')
+
+        # 数据入库
+        sql_engine.data_to_sql(
+            df_duplicate, path.pt_product_duplicate, 'append', db_util.connet_sellersprite_db_sql(sellersprite_database)
+        )
+
+        # 状态更新
+        sql_engine.connect_product(
+            config.sellersprite_hostname, config.sellersprite_password, sellersprite_database, sql.sql_duplicate_update
+        )
+
+        print('done')
+
+    else:
+        continue

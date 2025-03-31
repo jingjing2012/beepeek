@@ -1,11 +1,10 @@
-from sklearn.cluster import KMeans
-import pandas as pd
 import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
 
-
-from conn import sql_engine, mysql_config as config
-from util import data_cleaning_util
+import data_cleaning_util
 import pt_product_sql as sql
+from better.better.pt_product_report.conn import sql_engine, mysql_config as config
 
 
 def price_st(df, group_col, price_col):

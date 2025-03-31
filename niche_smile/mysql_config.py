@@ -27,7 +27,7 @@ oe_password = "betterreport168#"
 
 # 利基数据源库
 # 数据日期
-oe_data_date = "20240622"
+oe_data_date = "20250301"
 # 数据市场
 oe_data_country = "us"
 # oe_data_country = "uk"

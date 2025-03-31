@@ -1,15 +1,19 @@
 import sys
 import time
 import warnings
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from pandas.errors import SettingWithCopyWarning
 
-from conn import sql_engine, mysql_config as config
-from util import data_cleaning_util, calculation_util, calculate_util, duplicate_util
-import pt_product_report_path as path
+import calculate_util
+import calculation_util
+import data_cleaning_util
+import duplicate_util
 import pt_product_report_parameter as parameter
+import pt_product_report_path as path
 import pt_product_sql as sql
+from conn import sql_engine, mysql_config as config
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -29,13 +33,13 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=RuntimeWarning)
 
 start_time = time.time()
-"""
+
 # cpc数据处理
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, path.clue_self,
                            sql.clean_sql_cpc_from_keywords)
 sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, path.clue_self,
                            sql.insert_sql_cpc_from_keywords)
-"""
+
 # 1.数据连接
 df_kw = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                       config.clue_self_database, sql.sql_kw)
@@ -76,6 +80,10 @@ df_cpc = df_cpc[['keyword', 'bid_rangeMedian', 'bid_rangeEnd']]
 df_kw_cpc = df_kw.merge(df_cpc, how='left', on='keyword')
 df_kw_cpc = df_kw_cpc.query('bid_rangeMedian > 0')
 
+if df_kw_cpc.empty:
+    print('df_kw_cpc.empty')
+    sys.exit()
+
 df_kw_cpc['搜索排名权重'] = np.fmax(3, np.fmax(np.log10(df_kw_cpc['search_frequency'] + 1), 1))
 df_kw_cpc['ASIN_KW相关度'] = round(df_kw_cpc['relevance'] / df_kw_cpc['搜索排名权重'], 2)
 
@@ -86,14 +94,15 @@ df_kw_cpc = calculate_util.sort_and_rank(df_kw_cpc)
 df_kw_cpc = df_kw_cpc[df_kw_cpc['rank'] <= 5]
 
 # 加权CPC计算
-asin_df = df_kw_cpc.groupby('asin').agg({'price': 'first',
+asin_df = df_kw_cpc.groupby('asin').agg({'country': 'first',
+                                         'price': 'first',
                                          'recommend': 'first',
                                          '数据更新时间': 'first',
                                          'keyword': lambda x: ','.join(x.astype(str))}).reset_index()
 
 asin_df = asin_df.drop_duplicates(subset=['asin'], keep="first", inplace=False)
 
-kw_cpc_df = df_kw_cpc.groupby('asin').apply(lambda x: calculate_util.cpc_avg(x))
+kw_cpc_df = df_kw_cpc.groupby('asin', include_groups=False).apply(lambda x: calculate_util.cpc_avg(x))
 kw_cpc_df = data_cleaning_util.convert_col(kw_cpc_df, '加权CPC')
 
 asin_df = asin_df.merge(kw_cpc_df, how='left', on='asin')
@@ -116,34 +125,36 @@ asin_df['市场蓝海度'] = np.where(asin_df['CPC因子'] > 0, parameter.MS_a +
 df_opportunity = asin_df
 
 # tag表
-df_cpc_tag = df_opportunity[['asin', '加权CPC', '市场蓝海度', '数据更新时间']]
+df_cpc_tag = df_opportunity[['asin', 'country', '加权CPC', '市场蓝海度', '数据更新时间']]
 
 mr_list = ['加权CPC', '市场蓝海度']
 for mr in mr_list:
     calculation_util.get_mround(df_cpc_tag, mr, mr + '分布', 0.05)
 
-df_cpc_tag['data_id'] = df_cpc_tag['asin'] + " | " + pd.to_datetime(df_cpc_tag['数据更新时间']).dt.strftime(
-    '%Y-%m-%d')
+df_cpc_tag['data_id'] = df_cpc_tag['asin'] + " | " + df_cpc_tag['country'] + " | " + pd.to_datetime(
+    df_cpc_tag['数据更新时间']).dt.strftime('%Y-%m-%d')
 
 # 字段整合
 df_kw_cpc = df_kw_cpc[
-    ['asin', 'keyword', 'bid_rangeMedian', 'bid_rangeEnd', 'ASIN_KW相关度', 'rank', '数据更新时间']]
+    ['asin', 'country', 'keyword', 'bid_rangeMedian', 'bid_rangeEnd', 'ASIN_KW相关度', 'rank', '数据更新时间']]
 
 df_kw_cpc['clear_id'] = df_kw_cpc['asin'] + df_kw_cpc['keyword']
 df_kw_cpc = duplicate_util.df_cleaning(df_kw_cpc, 'clear_id')
 df_kw_cpc = df_kw_cpc.drop(['clear_id'], axis=1)
 
 df_kw_cpc.rename(columns={'asin': 'ASIN',
+                          'country': 'site',
                           'keyword': '关键词',
                           'bid_rangeMedian': 'AMZ_BID推荐',
                           'bid_rangeEnd': 'AMZ_BID上限',
                           'rank': '相关度排名'}, inplace=True)
 
 df_opportunity = df_opportunity[
-    ['asin', 'price', 'recommend', 'keyword', '加权CPC', '预期CR', '转化净值', '预期CPC', 'CPC因子', '市场蓝海度', '数据更新时间']]
+    ['asin', 'country', 'price', 'recommend', 'keyword', '加权CPC', '预期CR', '转化净值', '预期CPC', 'CPC因子', '市场蓝海度', '数据更新时间']]
 df_opportunity = duplicate_util.df_cleaning(df_opportunity, 'asin')
 
 df_opportunity.rename(columns={'asin': 'ASIN',
+                               'country': 'site',
                                'price': '价格',
                                'recommend': '推荐度',
                                'keyword': '关键词'}, inplace=True)
@@ -152,11 +163,12 @@ df_cpc_tag = df_cpc_tag[['asin', '加权CPC分布', '市场蓝海度分布', 'da
 
 df_group = df_opportunity
 
-df_group = df_group[['ASIN', '价格', '推荐度', '市场蓝海度', '数据更新时间']]
+df_group = df_group[['ASIN', 'site', '价格', '推荐度', '市场蓝海度', '数据更新时间']]
 
 df_group = duplicate_util.df_cleaning(df_group, 'ASIN')
 
 df_group.rename(columns={'ASIN': 'asin',
+                         'site': 'country',
                          '价格': 'price',
                          '推荐度': 'recommend',
                          '市场蓝海度': 'blue_ocean_estimate',

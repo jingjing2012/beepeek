@@ -1,7 +1,5 @@
-import sys
-
 from conn import sql_engine, mysql_config as config
-from util import db_util
+import db_util
 import pt_product_report_path as path
 import pt_product_sql as sql
 
@@ -34,74 +32,113 @@ def get_previous_periods(period):
 
 # -------------------------------------关联流量历史数据复用-------------------------------------
 
-df_get_group = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                             config.sellersprite_database, sql.sql_get_group)
-df_get_duplicate = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                 config.sellersprite_database, sql.sql_get_duplicate)
+sellersprite_month = str(config.sellersprite_database)[-6:]
+sellersprite_month_old, sellersprite_month_older = get_previous_periods(sellersprite_month)
 
-if df_get_duplicate.empty and (not df_get_group.empty):
+# sites = ['us', 'uk', 'de', 'fr']
+sites = ['us']
 
-    sellersprite_month = str(config.sellersprite_database)[-6:]
-    sellersprite_month_old, sellersprite_month_older = get_previous_periods(sellersprite_month)
-    sellersprite_database_old, sellersprite_database_older = 'sellersprite_' + str(sellersprite_month_old), \
-                                                             'sellersprite_' + str(sellersprite_month_older)
+for site in sites:
+    sellersprite_database = config.sellersprite_database + '_' + str(site)
 
-    # 状态更新
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_status_sql(sellersprite_database_old,
-                                                                config.sellersprite_database, -10))
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_status_sql(sellersprite_database_older,
-                                                                config.sellersprite_database, -20))
+    sellersprite_database_old = 'sellersprite_' + str(sellersprite_month_old)
+    sellersprite_database_older = 'sellersprite_' + str(sellersprite_month_older)
 
-    print(db_util.group_traffic_status_sql(sellersprite_database_older, config.sellersprite_database, -20))
+    # sellersprite_database_old = 'sellersprite_' + str(sellersprite_month_old) + '_' + str(site)
+    # sellersprite_database_older = 'sellersprite_' + str(sellersprite_month_older) + '_' + str(site)
 
-    # 复用表创建
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_create_sql(path.pt_relation_traffic,
-                                                                    path.pt_relation_traffic_old))
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_create_sql(path.pt_relation_traffic,
-                                                                    path.pt_relation_traffic_older))
+    df_get_group = sql_engine.connect_pt_product(
+        config.sellersprite_hostname, config.sellersprite_password, sellersprite_database, sql.sql_get_group
+    )
 
-    print(db_util.group_traffic_old_create_sql(path.pt_relation_traffic, path.pt_relation_traffic_older))
+    df_get_group_older = sql_engine.connect_pt_product(
+        config.sellersprite_hostname, config.sellersprite_password, sellersprite_database_older, sql.sql_get_group
+    )
 
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_create_sql(path.pt_relevance_asins,
-                                                                    path.pt_relevance_asins_old))
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_create_sql(path.pt_relevance_asins,
-                                                                    path.pt_relevance_asins_older))
+    df_get_duplicate = sql_engine.connect_pt_product(
+        config.sellersprite_hostname, config.sellersprite_password, sellersprite_database, sql.sql_get_duplicate
+    )
 
-    print(db_util.group_traffic_old_create_sql(path.pt_relevance_asins, path.pt_relevance_asins_older))
+    print(site)
 
-    # 复用表写入
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_insert_sql(sellersprite_database_old,
-                                                                    config.sellersprite_database,
-                                                                    path.pt_relation_traffic,
-                                                                    path.pt_relation_traffic_old, -10))
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_insert_sql(sellersprite_database_older,
-                                                                    config.sellersprite_database,
-                                                                    path.pt_relation_traffic,
-                                                                    path.pt_relation_traffic_older, -20))
+    if df_get_duplicate.empty and (not df_get_group.empty) and (not df_get_group_older.empty):
 
-    print(db_util.group_traffic_old_insert_sql(sellersprite_database_older, config.sellersprite_database,
-                                               path.pt_relation_traffic, path.pt_relation_traffic_older, -20))
+        # 状态更新
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_status_sql(sellersprite_database_old, sellersprite_database, -10)
+        )
 
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_insert_sql(sellersprite_database_old,
-                                                                    config.sellersprite_database,
-                                                                    path.pt_relevance_asins,
-                                                                    path.pt_relevance_asins_old, -10))
-    sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.sellersprite_database,
-                               db_util.group_traffic_old_insert_sql(sellersprite_database_older,
-                                                                    config.sellersprite_database,
-                                                                    path.pt_relevance_asins,
-                                                                    path.pt_relevance_asins_older, -20))
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_status_sql(sellersprite_database_older, sellersprite_database, -20)
+        )
 
-    print(db_util.group_traffic_old_insert_sql(sellersprite_database_older, config.sellersprite_database,
-                                               path.pt_relevance_asins, path.pt_relevance_asins_older, -20))
-else:
-    sys.exit()
+        # 复用表创建
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_create_sql(path.pt_relation_traffic, path.pt_relation_traffic_old)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_create_sql(path.pt_relation_traffic, path.pt_relation_traffic_older)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_create_sql(path.pt_relevance_asins, path.pt_relevance_asins_old)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_create_sql(path.pt_relevance_asins, path.pt_relevance_asins_older)
+        )
+
+        # 复用表写入
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_insert_sql(sellersprite_database_old, sellersprite_database,
+                                                 path.pt_relation_traffic, path.pt_relation_traffic_old, -10)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_insert_sql(sellersprite_database_older, sellersprite_database,
+                                                 path.pt_relation_traffic, path.pt_relation_traffic_older, -20)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_insert_sql(sellersprite_database_old, sellersprite_database,
+                                                 path.pt_relevance_asins, path.pt_relevance_asins_old, -10)
+        )
+
+        sql_engine.connect_product(
+            config.sellersprite_hostname,
+            config.sellersprite_password,
+            sellersprite_database,
+            db_util.group_traffic_old_insert_sql(sellersprite_database_older, sellersprite_database,
+                                                 path.pt_relevance_asins, path.pt_relevance_asins_older, -20)
+        )
+
+    else:
+        continue

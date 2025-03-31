@@ -42,15 +42,12 @@ def get_previous_saturday(weeks_back: int = 2) -> str:
     return formatted_date
 
 
-# 0.数据库表格操作
-def connect_mysql_niche(hostname, username, password, database, sql):
+# 0.连接数据并清空表格
+def connect_mysql_betterin(sql):
     try:
-        conn_betterin = pymysql.connect(
-            host=hostname,
-            user=username,
-            passwd=password,
-            database=database,
-            charset='utf8')
+        conn_betterin = pymysql.connect(host=config.betterin_hostname, user=config.betterin_username,
+                                        passwd=config.betterin_password, database=config.betterin_database,
+                                        charset='utf8')
         with conn_betterin.cursor() as cur:
             cur.execute(sql)
             conn_betterin.commit()
@@ -61,25 +58,19 @@ def connect_mysql_niche(hostname, username, password, database, sql):
 
 
 # 1.连接数据库并读取数据
-def connect_niche_original(database, sql):
-    conn_oe_str = sql_engine.conn_url(config.oe_hostname, config.oe_username, config.oe_password, database)
+def connect_niche_original(sql):
+    conn_oe_str = sql_engine.conn_url(config.oe_hostname, config.oe_username, config.oe_password, oe_database)
     with sql_engine.create_conn(conn_oe_str) as conn_oe:
         df = pd.read_sql(sql, conn_oe)
     return df
 
 
 def connect_niche(sql):
-    conn_niche_str = sql_engine.conn_url(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database)
+    conn_niche_str = sql_engine.conn_url(config.betterin_hostname, config.betterin_username, config.betterin_password,
+                                         config.betterin_database)
     with sql_engine.create_conn(conn_niche_str) as conn_niche:
         df = pd.read_sql(sql, conn_niche)
     return df
-
-
-# 数据库连接url
-def conn_url(hostname, username, password, database):
-    con_db_sql = f'mysql+pymysql://{username}:{password}@{hostname}/{database}?charset=utf8mb4'
-    return con_db_sql
 
 
 # 2.数据处理
@@ -199,19 +190,17 @@ def niche_category_complete(df, df_category):
     df = df.drop_duplicates()
     df['category_complete'] = np.where(df['一级类目名称'].isna(), df['category'],
                                        df['一级类目名称'].fillna("") + ":" + df['category'].fillna(""))
-    # 改进版本 2：使用 combine_first
-    df['一级类目名称'] = df['一级类目名称'].combine_first(df['category'].str.split(':').str[:-1].str.join(':'))
-    # df['一级类目名称'] = np.where(df['一级类目名称'].isna(),
-    #                         df['category'].str.split(':').apply(lambda x: ':'.join(x[:-1]), include_groups=False),
-    #                         df['一级类目名称'])
+    df['一级类目名称'] = np.where(df['一级类目名称'].isna(),
+                            df['category'].str.split(':').apply(lambda x: ':'.join(x[:-1]), include_groups=False),
+                            df['一级类目名称'])
     df = df[['asin', 'category_complete', '一级类目名称']]
     return df
 
 
-def niche_top_asin(df, df_category, n):
+def niche_top_asin(df, n):
     df = df.query('asin_click_sort==@n')
     df = df[['niche_id', 'asin', 'brand', 'category']]
-    df_category = niche_category_complete(df, df_category)
+    df_category = niche_category_complete(df, df_oe_category)
     df = pd.merge(df, df_category, on='asin', how="left")
     df['category_complete'] = df['category_complete'].fillna(df['category'])
     df.rename(columns={'asin': "ASIN" + str(n), 'brand': "ASIN" + str(n) + "品牌",
@@ -234,64 +223,87 @@ warnings.filterwarnings("ignore", message="invalid value encountered in double_s
 
 pd.set_option('future.no_silent_downcasting', True)
 
-df_famous_brand = connect_niche(niche_sql.niche_famous_brand)
-df_niche_x = connect_niche(niche_sql.niche_x)
-df_season = connect_niche(niche_sql.niche_season)
-df_translate = connect_niche(niche_sql.niche_translate)
-
 # 使用示例
-# last_saturday = get_previous_saturday()
-last_saturday = 20250222
+last_saturday = get_previous_saturday()
 print(f"上上周六的日期是: {last_saturday}")
 
-sites = ['us']
+sites = ['us', 'uk', 'de', 'fr']
 
 for site in sites:
     oe_database = f'oe_{site}_{last_saturday}'
 
     start_time = time.time()
-
-    # 创建索引
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_category)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_niche_commodity)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_commodity)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_niche_trends)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_keywords)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_keywords_kw)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_pt_keywords_sv)
-    connect_mysql_niche(config.oe_hostname, config.oe_username, config.oe_password, oe_database,
-                        niche_sql.create_index_sql_cpc_from_keywords)
-
     # 当清洗US表时清空keywords、asin、trends表，方便替换为最新周数据
     niche_table_list = [path.Keyword_sql_name, path.ASINs_sql_name, path.Trends_sql_name, path.niche_price]
 
     for niche_table in niche_table_list:
         if site == 'us':
             clear_sql = "TRUNCATE TABLE " + niche_table
-            connect_mysql_niche(
-            config.betterin_hostname,
-            config.betterin_username,
-            config.betterin_password,
-            config.betterin_database,clear_sql)
+            connect_mysql_betterin(clear_sql)
 
     # 循环参数
-    row_start = 0
+    row_start = 1
     row_increment = 1000
     row_end = 100000
 
     # 循环写入表格数据
     while row_start < row_end:
         # 1.读取原始数据
-        print(oe_database)
+        niche_key_sql = 'select * from pt_niche where id >' + str(row_start) + ' ORDER BY id ASC LIMIT ' + str(
+            row_increment)
+
+        niche_trends_sql = 'select *,' + oe_database + "." + path.oe_trends_name + \
+                           '.product_count as "product_count_7" from (' + niche_key_sql + ') pt_niche_title left join ' + \
+                           path.oe_trends_name + ' on pt_niche_title.niche_id = ' + path.oe_trends_name + '.niche_id'
+
+        niche_asin_sql_us = "select * from (" + niche_key_sql + ") pt_niche_title left join " + \
+                            oe_database + "." + path.oe_asin_name + " on pt_niche_title.niche_id =" + \
+                            oe_database + "." + path.oe_asin_name + ".niche_id left join " + \
+                            config.oe_database_asin + "." + path.oe_commodity_name + " on " + \
+                            oe_database + "." + path.oe_asin_name + ".asin =" + \
+                            config.oe_database_asin + "." + path.oe_commodity_name + ".asin"
+
+        niche_asin_sql = "select * from (" + niche_key_sql + ") pt_niche_title left join " + \
+                         oe_database + "." + path.oe_asin_name + " on pt_niche_title.niche_id =" + \
+                         oe_database + "." + path.oe_asin_name + ".niche_id left join " + \
+                         oe_database + "." + path.oe_commodity_name + " on " + \
+                         oe_database + "." + path.oe_asin_name + ".asin =" + \
+                         oe_database + "." + path.oe_commodity_name + ".asin"
+
+        niche_keywords_sql = "select pt_niche_title.niche_title,pt_niche_title.mkid," \
+                             + oe_database + "." + path.oe_keywords_name + ".keyword," \
+                             + oe_database + "." + path.oe_keywords_name + ".niche_id," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_term_id," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_conversion_rate," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_volume_t_90," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_volume_qoq," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_volume_yoy," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_volume_t_360," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_volume_growth_t_360_yoy," \
+                             + oe_database + "." + path.oe_keywords_name + ".search_conversion_rate_t_360," \
+                             + oe_database + "." + path.oe_keywords_name + ".click_share," \
+                             + oe_database + "." + path.oe_keywords_name + ".click_share_t_360 from (" + \
+                             niche_key_sql + ") pt_niche_title left join " + \
+                             oe_database + "." + path.oe_keywords_name + " on " + \
+                             oe_database + ".pt_niche_title.niche_id =" + \
+                             oe_database + "." + path.oe_keywords_name + ".niche_id"
+        niche_keywords_top5_sql = "SELECT * FROM(SELECT *,ROW_NUMBER() OVER (PARTITION by keywords.niche_id " + \
+                                  "ORDER BY keywords.search_volume_t_360 DESC) AS 'rank' from(" + niche_keywords_sql + \
+                                  " WHERE " + oe_database + "." + path.oe_keywords_name + ".id is NOT NULL) " + \
+                                  "keywords) keywords_top WHERE keywords_top.rank<=5"
+        niche_keywords_cpc_us = "SELECT parent_id,keyword AS 'keyword_amz',bid_rangeMedian,bid_rangeEnd FROM " + \
+                                config.oe_database_cpc + "." + path.oe_cpc_name + " WHERE crawler_status=1"
+        niche_keywords_cpc = "SELECT parent_id,keyword AS 'keyword_amz',bid_rangeMedian,bid_rangeEnd FROM " + \
+                             oe_database + "." + path.oe_cpc_name + " WHERE crawler_status=1"
+        niche_cpc_us = "SELECT niche_title,mkid,keyword,niche_id,search_volume_t_360,bid_rangeMedian,bid_rangeEnd FROM(" + \
+                       niche_keywords_top5_sql + ") keywords_top5 LEFT JOIN (" + niche_keywords_cpc_us + ") keywords_cpc" + \
+                       " ON keywords_top5.keyword = keywords_cpc.keyword_amz WHERE keywords_cpc.parent_id IS NOT NULL"
+        niche_cpc = "SELECT niche_title,mkid,keyword,niche_id,search_volume_t_360,bid_rangeMedian,bid_rangeEnd FROM(" + \
+                    niche_keywords_top5_sql + ") keywords_top5 LEFT JOIN (" + niche_keywords_cpc + ") keywords_cpc" + \
+                    " ON keywords_top5.keyword = keywords_cpc.keyword_amz WHERE keywords_cpc.parent_id IS NOT NULL"
+
         # 主表读取
-        df_niche = connect_niche_original(oe_database, sql_engine.niche_key_sql(row_start, row_increment))
+        df_niche = connect_niche_original(niche_key_sql)
 
         # 空数据判断
         if df_niche.empty:
@@ -299,13 +311,29 @@ for site in sites:
             continue
 
         # asin表读取
-        df_asin = connect_niche_original(oe_database, sql_engine.niche_asin_sql(row_start, row_increment))
-        df_keywords = connect_niche_original(oe_database, sql_engine.niche_keywords_sql(row_start, row_increment))
-        df_cpc = connect_niche_original(oe_database, sql_engine.niche_cpc_sql(row_start, row_increment))
-        df_trends = connect_niche_original(oe_database, sql_engine.niche_trends_sql(row_start, row_increment))
-        df_oe_category = connect_niche_original(oe_database, niche_sql.niche_category_sql)
+        data_date = str(oe_database)[-8:]
+        if oe_database.startswith("oe_us") and data_date < str(20240101):
+            print("TRUE")
+            df_asin = connect_niche_original(niche_asin_sql_us)
+            df_cpc = connect_niche_original(niche_cpc_us)
+            if df_cpc.empty:
+                df_cpc = connect_niche(niche_sql.niche_cpc)
+        elif oe_database.startswith("oe_us"):
+            print("FLASE")
+            df_asin = connect_niche_original(niche_asin_sql)
+            df_cpc = connect_niche_original(niche_cpc)
+        else:
+            df_asin = connect_niche_original(niche_asin_sql_us)
+            df_cpc = connect_niche(niche_sql.niche_cpc)
 
-        print("用时：" + (time.time() - start_time).__str__())
+        # 其他表读取
+        df_keywords = connect_niche_original(niche_keywords_sql)
+        df_trends = connect_niche_original(niche_trends_sql)
+        df_oe_category = connect_niche_original(niche_sql.niche_category_sql)
+        df_famous_brand = connect_niche(niche_sql.niche_famous_brand)
+        df_niche_x = connect_niche(niche_sql.niche_x)
+        df_season = connect_niche(niche_sql.niche_season)
+        df_translate = connect_niche(niche_sql.niche_translate)
 
         # 2.数据预处理
         # 站点修正
@@ -373,8 +401,6 @@ for site in sites:
         df_cpc['search_volume_t_360'] = df_cpc['search_volume_t_360'].round(0)
         df_cpc['bid_rangeMedian'] = df_cpc['bid_rangeMedian'].astype('float64').round(decimals=2)
 
-        print("用时：" + (time.time() - start_time).__str__())
-
         # 2.1 niche表处理
         # 总点击量
         df_niche_click = df_asin.groupby('niche_id')['asin_click_count_t_360'].sum()
@@ -415,13 +441,13 @@ for site in sites:
         df_date_new = trend_group_new[['dataset_date', 'search_volume_t_7', 'search_conversion_rate_t_7']]
 
         # 周SCR_MAX_Date,周SCR_MIN_Date
-        trends_group_max_date = df_trends.groupby('niche_id', include_groups=False).apply(
+        trends_group_max_date = df_trends.groupby('niche_id').apply(
             lambda t: t[t.search_conversion_rate_t_7 == t.search_conversion_rate_t_7.max()])
         trends_group_max_date = trends_group_max_date.drop_duplicates(subset=['niche_id'], keep="first", inplace=False)
         df_scr_max_date = trends_group_max_date[['dataset_date']]
         df_scr_max_date.columns = ['周SCR_MAX_Date']
 
-        trends_group_min_date = df_trends.groupby('niche_id', include_groups=False).apply(
+        trends_group_min_date = df_trends.groupby('niche_id').apply(
             lambda s: s[s.search_conversion_rate_t_7 == s.search_conversion_rate_t_7.min()])
         trends_group_min_date = trends_group_min_date.drop_duplicates(subset=['niche_id'], keep="first", inplace=False)
         df_scr_min_date = trends_group_min_date[['dataset_date']]
@@ -450,8 +476,9 @@ for site in sites:
 
         # 平均每单件数_trends
         df_cal_niche['平均每单件数_trends'] = np.where(df_cal_niche['search_volume_t_360'] * df_cal_niche['周SCR_AVG'] * 1 > 0,
-                                                 round(df_cal_niche['总售出件数_360'] /
-                                                       (df_cal_niche['search_volume_t_360'] * df_cal_niche['周SCR_AVG']),
+                                                 round(df_cal_niche['总售出件数_360'] / (
+                                                         df_cal_niche['search_volume_t_360'] * df_cal_niche[
+                                                     '周SCR_AVG']),
                                                        2), np.nan)
 
         # 平均每单件数
@@ -565,25 +592,23 @@ for site in sites:
                 'avg_oosrate_t360_count_yoy': 'Average Out of Stock Rate_360',
                 'avg_detail_page_quality_currentvalue': 'Average Product Listing Quality_90'}, inplace=True)
 
-        print("用时：" + (time.time() - start_time).__str__())
-
         # 2.2 niche_size表处理
 
         # 类目数据处理
         # 使用applymap()函数将字母转换为小写
         # df_oe_category = df_oe_category.applymap(lambda x: x.lower() if isinstance(x, str) else x)
-        # df_oe_category = df_oe_category.apply(lambda col: col.map(lambda x: x.lower() if isinstance(x, str) else x))
+        df_oe_category = df_oe_category.apply(lambda col: col.map(lambda x: x.lower() if isinstance(x, str) else x))
         df_oe_category['类目id'] = df_oe_category['二级类目名称'] + ":" + df_oe_category['三级类目名称']
-        df_oe_category = df_oe_category[['类目id', '一级类目名称', '二级类目名称']].drop_duplicates()
+        df_oe_category = df_oe_category[['类目id', '一级类目名称', '二级类目名称']]
 
         # ASIN1-3数据
         df_asin['category'] = df_asin['category'].str.replace("/", ":")
         df_asin['asin_click_sort'] = df_asin['asin_click_count_t_360'].groupby(df_asin['niche_id']).rank(
             ascending=False)
 
-        df_asin1 = niche_top_asin(df_asin, df_oe_category, 1)
-        df_asin2 = niche_top_asin(df_asin, df_oe_category, 2)
-        df_asin3 = niche_top_asin(df_asin, df_oe_category, 3)
+        df_asin1 = niche_top_asin(df_asin, 1)
+        df_asin2 = niche_top_asin(df_asin, 2)
+        df_asin3 = niche_top_asin(df_asin, 3)
 
         # 知名品牌识别
         df_asin1 = df_asin1.merge(df_famous_brand, how="left", left_on="ASIN1品牌", right_on="关键词")
@@ -820,8 +845,6 @@ for site in sites:
                      '总点击量_y': "总点击量",
                      'dataset_date': "数据更新时间"}, inplace=True)
 
-        print("用时：" + (time.time() - start_time).__str__())
-
         # 2.3 keywords表处理
 
         # 字段整合到表
@@ -934,8 +957,6 @@ for site in sites:
                      'launch_date': "发布日期",
                      'dataset_date': "数据更新时间"}, inplace=True)
 
-        print("用时：" + (time.time() - start_time).__str__())
-
         # 2.5 trends表处理
         df_trends = df_trends.merge(df_date_new, how="left", on="niche_id")
         df_trends['周GMV'] = df_trends['search_volume_t_7_x'] * df_trends['search_conversion_rate_t_7_x'] * df_trends[
@@ -963,8 +984,6 @@ for site in sites:
                      'average_price_t_7': "平均价格_7",
                      'product_count_7': "商品数量_7",
                      'dataset_date_y': "数据更新时间"}, inplace=True)
-
-        print("用时：" + (time.time() - start_time).__str__())
 
         # 3.niche_smile表处理
         df_niche_smile_pre = df_cal_price.merge(df_cal_size, how='left', on='利基站点')
@@ -1553,23 +1572,13 @@ for site in sites:
         oe_save_to_sql(df_niche_keywords, path.Keyword_sql_name, "append", config.connet_betterin_db_sql)
         oe_save_to_sql(df_niche_h, path.niche_smile_h, "append", config.connet_betterin_db_sql)
 
-        row_start += row_increment
+        row_start = row_start + row_increment
         print("row_start：" + row_start.__str__())
         print("用时：" + (time.time() - start_time).__str__())
 
-    connect_mysql_niche(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database,
-        niche_sql.clear_smile_sql)
-    connect_mysql_niche(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database,
-        niche_sql.insert_smile_sql)
-    connect_mysql_niche(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database,
-        niche_sql.update_smile_url_sql)
-    connect_mysql_niche(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database,
-        niche_sql.clear_smile_tag_sql)
-    connect_mysql_niche(
-        config.betterin_hostname, config.betterin_username, config.betterin_password, config.betterin_database,
-        niche_sql.create_smile_tag_sql)
+    connect_mysql_betterin(niche_sql.clear_smile_sql)
+    connect_mysql_betterin(niche_sql.insert_smile_sql)
+    connect_mysql_betterin(niche_sql.update_smile_url_sql)
+    connect_mysql_betterin(niche_sql.clear_smile_tag_sql)
+    connect_mysql_betterin(niche_sql.create_smile_tag_sql)
     print("用时：" + (time.time() - start_time).__str__())

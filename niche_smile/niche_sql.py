@@ -1,5 +1,14 @@
-import mysql_config as config
 from better.better.niche_data import niche_data_path as path
+
+# 创建索引
+create_index_sql_pt_category = 'CREATE INDEX parent_id ON pt_category(parent_id);'
+create_index_sql_pt_niche_commodity = 'CREATE INDEX asin ON pt_niche_commodity(asin);'
+create_index_sql_pt_commodity = 'CREATE INDEX asin ON pt_commodity(asin);'
+create_index_sql_pt_niche_trends = 'CREATE INDEX niche_id ON pt_niche_trends(niche_id);'
+create_index_sql_pt_keywords = 'CREATE INDEX niche_id ON pt_keywords(niche_id);'
+create_index_sql_pt_keywords_kw = 'CREATE INDEX kw ON pt_keywords(keyword);'
+create_index_sql_pt_keywords_sv = 'CREATE INDEX sv ON pt_keywords(search_volume_t_360);'
+create_index_sql_cpc_from_keywords = 'CREATE INDEX parent_id ON cpc_from_keywords(parent_id);'
 
 niche_famous_brand = 'select 关键词, 类型 from ' + path.niche_forbidden + ' where 类型 = "知名品牌"'
 
@@ -13,36 +22,81 @@ niche_cpc = 'select 利基站点, CPC from ' + path.niche_cpc
 
 niche_new = 'select 利基站点 from ' + path.niche_new
 
-niche_category_sql = 'select `c`.`一级类目id` AS `一级类目id`,' \
-                     '`c`.`一级类目名称` AS `一级类目名称`,' \
-                     '`c`.`二级类目id` AS `二级类目id`,' \
-                     '`c`.`二级类目名称` AS `二级类目名称`,' \
-                     '`c`.`三级类目id` AS `三级类目id`,' \
-                     '`c`.`三级类目名称` AS `三级类目名称`,' \
-                     + config.oe_database + '.`pt_category`.`category_id` AS `四级类目id`,' \
-                     + config.oe_database + '.`pt_category`.`category_name` AS `四级类目名称` from (' \
-                     + config.oe_database + '.`pt_category` left join (select `b`.`一级类目id` AS `一级类目id`,' \
-                                            '`b`.`一级类目名称` AS `一级类目名称`,' \
-                                            '`b`.`二级类目id` AS `二级类目id`,`b`.`二级类目名称` AS `二级类目名称`,' \
-                     + config.oe_database + '.`pt_category`.`category_id` AS `三级类目id`,' \
-                     + config.oe_database + '.`pt_category`.`category_name` AS `三级类目名称` from (' \
-                     + config.oe_database + '.`pt_category` left join (select `a`.`category_id` AS `一级类目id`,' \
-                                            '`a`.`category_name` AS `一级类目名称`,' \
-                     + config.oe_database + '.`pt_category`.`category_id` AS `二级类目id`,' \
-                     + config.oe_database + '.`pt_category`.`category_name` AS `二级类目名称` from (' \
-                     + config.oe_database + '.`pt_category` left join (select ' \
-                     + config.oe_database + '.`pt_category`.`category_id` AS `category_id`,' \
-                     + config.oe_database + '.`pt_category`.`category_name` AS `category_name` from ' \
-                     + config.oe_database + '.`pt_category` where (' \
-                     + config.oe_database + '.`pt_category`.`parent_id` is null)) `a` on((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` = `a`.`category_id`))) where ((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` is not null) and ' \
-                                            '(`a`.`category_id` is not null))) `b` on((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` = `b`.`二级类目id`))) where ((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` is not null) and ' \
-                                            '(`b`.`一级类目id` is not null))) `c` on((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` = `c`.`三级类目id`))) where ((' \
-                     + config.oe_database + '.`pt_category`.`parent_id` is not null) and (`c`.`一级类目id` is not null))'
+niche_keywords_cpc_sql = """
+    SELECT
+	parent_id,
+	keyword AS 'keyword_amz',
+	bid_rangeMedian,
+	bid_rangeEnd 
+FROM
+	cpc_from_keywords 
+WHERE
+	crawler_status =1
+	"""
+
+niche_category_sql = """
+SELECT
+	`c`.`一级类目id` AS `一级类目id`,
+	`c`.`一级类目名称` AS `一级类目名称`,
+	`c`.`二级类目id` AS `二级类目id`,
+	`c`.`二级类目名称` AS `二级类目名称`,
+	`c`.`三级类目id` AS `三级类目id`,
+	`c`.`三级类目名称` AS `三级类目名称`,
+	`pt_category`.`category_id` AS `四级类目id`,
+	`pt_category`.`category_name` AS `四级类目名称` 
+FROM
+	(
+		`pt_category`
+		LEFT JOIN (
+		SELECT
+			`b`.`一级类目id` AS `一级类目id`,
+			`b`.`一级类目名称` AS `一级类目名称`,
+			`b`.`二级类目id` AS `二级类目id`,
+			`b`.`二级类目名称` AS `二级类目名称`,
+			`pt_category`.`category_id` AS `三级类目id`,
+			`pt_category`.`category_name` AS `三级类目名称` 
+		FROM
+			(
+				`pt_category`
+				LEFT JOIN (
+				SELECT
+					`a`.`category_id` AS `一级类目id`,
+					`a`.`category_name` AS `一级类目名称`,
+					`pt_category`.`category_id` AS `二级类目id`,
+					`pt_category`.`category_name` AS `二级类目名称` 
+				FROM
+					(
+						`pt_category`
+						LEFT JOIN (
+						SELECT
+							`pt_category`.`category_id` AS `category_id`,
+							`pt_category`.`category_name` AS `category_name` 
+						FROM
+							`pt_category` 
+						WHERE
+							( `pt_category`.`parent_id` IS NULL )) `a` ON ((
+								`pt_category`.`parent_id` = `a`.`category_id` 
+							))) 
+				WHERE
+					((
+							`pt_category`.`parent_id` IS NOT NULL 
+							) 
+						AND ( `a`.`category_id` IS NOT NULL ))) `b` ON ((
+						`pt_category`.`parent_id` = `b`.`二级类目id` 
+					))) 
+		WHERE
+			((
+					`pt_category`.`parent_id` IS NOT NULL 
+					) 
+				AND ( `b`.`一级类目id` IS NOT NULL ))) `c` ON ((
+				`pt_category`.`parent_id` = `c`.`三级类目id` 
+			))) 
+WHERE
+	((
+			`pt_category`.`parent_id` IS NOT NULL 
+		) 
+	AND ( `c`.`一级类目id` IS NOT NULL ))
+"""
 
 # niche_smile表处理
 clear_smile_sql = "TRUNCATE TABLE " + path.niche_smile

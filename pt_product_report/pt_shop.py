@@ -1,14 +1,17 @@
+import warnings
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from datetime import datetime
-import warnings
 
-from conn import mysql_config as config, sql_engine
-from util import data_cleaning_util as clean_util, common_util, duplicate_util
-import pt_product_sql as sql
+import common_util
+import data_cleaning_util as clean_util
+import duplicate_util
 import profit_cal
-import pt_product_report_path as path
 import pt_product_report_parameter as para
+import pt_product_report_path as path
+import pt_product_sql as sql
+from conn import mysql_config as config, sql_engine
 
 
 # 开售月数计算
@@ -39,21 +42,24 @@ def hhi_cal(df, hhi_cal_col):
 warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 # 状态码更新
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
-                           sql.sql_report_brand_status)
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
-                           sql.sql_report_seller_status)
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
-                           sql.sql_seller_brand_status)
-sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database,
-                           sql.sql_seller_seller_status)
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_report_brand_status)
+
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_report_seller_status)
+
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_seller_brand_status)
+
+sql_engine.connect_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_seller_seller_status)
 
 # 数据连接
-df_brand_report = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                config.clue_shop_database, sql.sql_brand_report)
+df_brand_report = sql_engine.connect_pt_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_brand_report)
 
-df_seller_product = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                                  config.clue_shop_database, sql.sql_seller_product)
+df_seller_product = sql_engine.connect_pt_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_seller_product)
 
 # 数据格式清洗
 df_brand_report['task_asin'] = df_brand_report['asin'] + ' | ' + df_brand_report['task_tag']

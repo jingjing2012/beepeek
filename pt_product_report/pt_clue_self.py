@@ -71,6 +71,8 @@ df_shop_self = data_read(data_path.pt_shop_table_self, data_path.sheet_shop)
 # ---------------------------------------数据处理---------------------------------------
 
 df_product_self = df_product_self[['ASIN', '提报人员', '提报日期', '批次Tag']]
+df_product_self['country'] = 'US'
+
 df_product_self.rename(columns={'ASIN': 'asin',
                                 '提报人员': 'name',
                                 '提报日期': 'update_time',
@@ -141,14 +143,14 @@ df_clue_fbm = data_duplicate(df_product_fbm, df_clue_fbm_history)
 
 # ---------------------------------------数据整合---------------------------------------
 
-df_clue_self_pt = df_product_self_pt[['asin', 'update_time']]
+df_clue_self_pt = df_product_self_pt[['asin', 'country', 'update_time']]
 df_clue_self_pt['data_tag'] = '自主提报'
 
-df_clue_sampling_pt = df_product_sampling_pt[['asin', 'update_time']]
+df_clue_sampling_pt = df_product_sampling_pt[['asin', 'country', 'update_time']]
 df_clue_sampling_pt['data_tag'] = '历史开品'
 
 df_clue_sbi = df_clue_sbi[['asin']]
-df_clue_sbi_pt = df_product_sbi_pt[['asin', 'update_time']]
+df_clue_sbi_pt = df_product_sbi_pt[['asin', 'country', 'update_time']]
 df_clue_sbi_pt['data_tag'] = '历史开售'
 
 df_clue_pt = pd.concat([df_clue_self_pt, df_clue_sampling_pt, df_clue_sbi_pt, df_clue_fbm], ignore_index=True)
@@ -179,9 +181,12 @@ sql_engine.connect_product(config.sellersprite_hostname, config.sellersprite_pas
                            sql.update_seller_product_sales_sql)
 
 # 店铺挖掘可跟卖线索知产速筛
-df_shop_follow = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
-                                               config.clue_shop_database, sql.sql_shop_follow)
-df_shop_follow_history = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, config.product_database,
-                                                       sql.sql_shop_follow_history)
+df_shop_follow = sql_engine.connect_pt_product(
+    config.sellersprite_hostname, config.sellersprite_password, config.clue_shop_database, sql.sql_shop_follow)
+
+df_shop_follow_history = sql_engine.connect_pt_product(
+    config.oe_hostname, config.oe_password, config.product_database, sql.sql_shop_follow_history)
+
 df_shop_follow_ai = data_duplicate(df_shop_follow, df_shop_follow_history)
+
 sql_engine.data_to_sql(df_shop_follow_ai, data_path.seller_product_follow, "append", config.connet_product_db_sql)

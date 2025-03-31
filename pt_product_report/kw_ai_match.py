@@ -33,8 +33,7 @@ def call_api(api_url, params):
 df_kw = sql_engine.connect_pt_product(config.sellersprite_hostname, config.sellersprite_password,
                                       config.clue_position_database, sql.sql_kw_ai_match)
 
-df_kw = df_kw[df_kw['site'] == 'us']
-# df_kw = df_kw.drop('site', axis=1)
+# df_kw = df_kw[df_kw['site'] == 'de']
 
 df_kw = df_kw.drop_duplicates()
 
@@ -59,11 +58,22 @@ else:
         clue_result = api_data.get('result')
 
         # 数据清洗
-        clue_df = pd.json_normalize(clue_result['keywords_result'])
+        import pandas as pd
+
+        # 假设 clue_result 是 API 或 JSON 解析的结果
+        if clue_result.get('keywords_result') is None:
+            print("⚠️ keywords_result 为空，无法创建 DataFrame")
+            clue_df = pd.DataFrame()  # 创建空 DataFrame，防止代码崩溃
+        else:
+            clue_df = pd.DataFrame.from_records(clue_result['keywords_result'])
+
+        # clue_df = pd.DataFrame.from_records(clue_result['keywords_result'])
+        # clue_df = pd.json_normalize(clue_result['keywords_result'])   # pandas2旧方法，已不稳定，舍弃
         clue_df['asin'] = params.get('asin')
         clue_df['site'] = params.get('site')
 
         print(params.get('asin'))
+        # print(clue_df.columns)
 
         # 数据入库
         sql_engine.data_to_sql(clue_df, path.pt_clue_kw, 'append', config.connet_clue_position_db_sql)

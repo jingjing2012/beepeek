@@ -1,14 +1,20 @@
 import sys
-from datetime import datetime
+import warnings
+
 import numpy as np
 import pandas as pd
-import warnings
 from pandas.errors import PerformanceWarning, SettingWithCopyWarning
 
-from conn import sql_engine, mysql_config as config
+import calculate_util
+import calculation_util
+import common_util
+import data_cleaning_util
+import db_util
+import duplicate_util
 import pt_product_report_parameter as para
 import pt_product_report_path as path
 import pt_product_sql as sql
+from conn import sql_engine, mysql_config as config
 
 
 # 数据类型修正
@@ -219,6 +225,8 @@ warnings.filterwarnings("ignore", message="pandas only support SQLAlchemy connec
 warnings.filterwarnings("ignore", message="invalid value encountered in double_scalars")
 warnings.filterwarnings("ignore", message="DataFrame is highly fragmented.", category=PerformanceWarning)
 
+site = 'us'
+
 # 1.数据连接
 df_famous_brand = sql_engine.connect_pt_product(config.oe_hostname, config.oe_password, path.product_database,
                                                 sql.famous_brand_sql)
@@ -239,62 +247,79 @@ df_relation = df_relation.merge(df_product, how='left', on='related_asin')
 
 # 2.数据预处理
 df_relation['ASIN'] = df_relation['asin']
-product_con_list_1 = ['category_bsr_growth', 'sales_growth', 'price', 'gross_margin', 'fba_fees']
+df_relation = df_relation[(df_relation['relevance'] >= 0.5) & (df_relation['category_relevance'] >= 0)]
+
+# 数据类型转换
+product_con_list_1 = ['category_bsr_growth', 'sales_growth', 'price', 'monthly_revenue', 'gross_margin',
+                      'fba_fees']
+
 for con_i in product_con_list_1:
-    convert_type(df_relation, con_i, 2)
+    df_relation[con_i] = data_cleaning_util.convert_type(df_relation, con_i, 2)
 
 product_con_list_2 = ['sales', 'qa', 'ratings', 'variations']
+
 for con_j in product_con_list_2:
-    convert_type(df_relation, con_j, 0)
+    df_relation[con_j] = data_cleaning_util.convert_type(df_relation, con_j, 0)
 
-convert_type(df_relation, 'reviews_rate', 4)
-convert_type(df_relation, 'rating', 1)
+df_relation['reviews_rate'] = data_cleaning_util.convert_type(df_relation, 'reviews_rate', 4)
 
-product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'seller_type', 'buybox_seller',
-                      'ac_keyword', 'weight', '二级类目']
+df_relation['rating'] = data_cleaning_util.convert_type(df_relation, 'rating', 1)
+
+product_con_list_3 = ['brand', 'title', 'category_path', 'category', 'sub_category', 'parent',
+                      'seller_type', 'buybox_seller', 'ac_keyword', 'weight', '二级类目']
+
 for con_l in product_con_list_3:
-    convert_str(df_relation, con_l)
+    df_relation[con_l] = data_cleaning_util.convert_str(df_relation, con_l)
 
 product_con_list_5 = ['title', 'category_path', 'category', 'sub_category', 'ac_keyword', 'weight', '二级类目']
+
 for con_lower in product_con_list_5:
     df_relation[con_lower] = df_relation[con_lower].str.lower()
 
-product_con_list_4 = ['date_available', 'update_time', '数据更新时间']
-for con_h in product_con_list_4:
-    convert_date(df_relation, con_h)
+product_con_list_4 = ['date_available', 'update_time']
 
-# percent_convert(df_relation, 'monthly_revenue_increase')
-convert_type(df_relation, 'sales_growth', 4)
+for con_h in product_con_list_4:
+    df_relation[con_h] = data_cleaning_util.convert_date(df_relation, con_h)
+
+df_relation['sales_growth'] = data_cleaning_util.convert_type(df_relation, 'sales_growth', 4)
+
 df_relation['monthly_revenue_increase'] = df_relation['sales_growth']
 
-convert_str(df_famous_brand, 'brand')
-convert_type(df_famous_brand, '疑似知名品牌', 0)
-convert_str(df_holiday, '节日关键词')
+df_famous_brand['brand'] = data_cleaning_util.convert_str(df_famous_brand, 'brand')
+
+df_famous_brand['疑似知名品牌'] = data_cleaning_util.convert_type(df_famous_brand, '疑似知名品牌', 0)
+
+df_holiday['节日关键词'] = data_cleaning_util.convert_str(df_holiday, '节日关键词')
+
 df_holiday['节日关键词'] = df_holiday['节日关键词'].str.lower()
 
 for error_u, replace_m in para.replace_related_type_dict.items():
-    df_relation.loc[:, 'related_type'] = df_relation['related_type'].str.replace(error_u, replace_m, regex=False)
+    df_relation.loc[:, 'related_type'] = df_relation['related_type'].str.replace(
+        error_u, replace_m, regex=False)
+
+df_relation.loc[:, 'related_type'] = df_relation['related_type'].fillna("以图搜图")
 
 # 3.获取主推变体款
-df_related_traffic = df_relation[(df_relation['relevance'] >= 0.5) & (df_relation['category_relevance'] >= 0)]
 
 # 3.1开售月数
-month_available(df_related_traffic)
+month_available(df_relation)
 
 # 3.2排序
 # 销额处理
-df_related_traffic['monthly_revenue'] = df_related_traffic['monthly_revenue'].fillna(0)
-df_related_traffic['monthly_revenue_avg'] = df_related_traffic.groupby(df_related_traffic['parent'])[
-    'monthly_revenue'].mean().reset_index(drop=True)
+df_relation['monthly_revenue'] = df_relation['monthly_revenue'].fillna(0)
+
+df_relation_revenue_avg = df_relation.groupby(df_relation['parent'])['monthly_revenue'].mean()
+df_relation_revenue_avg = data_cleaning_util.convert_col(df_relation_revenue_avg, 'monthly_revenue_avg')
+df_relation = df_relation.merge(df_relation_revenue_avg, how='left', on='parent')
 
 # 竞品销额均为空的处理
-df_parent_0 = df_related_traffic.loc[df_related_traffic['monthly_revenue_avg'] == 0]
-df_parent_0.loc[:, 'rank'] = sort_and_rank(df_parent_0)
+df_parent_0 = df_relation.loc[df_relation['monthly_revenue_avg'] == 0]
+df_parent_0.loc[:, 'rank'] = calculate_util.sort_and_rank_group(df_parent_0)
 
 # 竞品销额含非空的处理
-df_parent_1 = df_related_traffic.loc[
-    (df_related_traffic['monthly_revenue_avg'] > 0) & (df_related_traffic['monthly_revenue'] > 0)]
-df_parent_1.loc[:, 'rank'] = sort_and_rank(df_parent_1)
+df_parent_1 = df_relation.loc[
+    (df_relation['monthly_revenue_avg'] > 0) & (df_relation['monthly_revenue'] > 0)]
+df_parent_1.loc[:, 'rank'] = calculate_util.sort_and_rank_group(df_parent_1)
 
 df_main = pd.concat([df_parent_0[df_parent_0['rank'] == 1], df_parent_1[df_parent_1['rank'] == 1]])
 
@@ -305,27 +330,7 @@ df_main_weight = df_main[df_main['weight'].notnull()]
 if not df_main_weight.empty:
     # 替换错误单位
     for error_unit, replacement in para.replace_weight_error_dict.items():
-        df_main_weight['weight'] = df_main_weight['weight'].str.replace(error_unit, replacement, regex=False)
-
-    # 一次性分割并创建新列
-    weight_split = df_main_weight['weight'].str.split(" ", expand=True)
-    df_main_weight['重量值'] = weight_split[0]
-    df_main_weight['单位'] = weight_split[1]
-
-    # 去除不合法单位和重量值
-    df_main_weight.loc[~df_main_weight['单位'].isin(para.replace_weight_unit_list), '单位'] = np.nan
-    df_main_weight['重量值判断'] = df_main_weight['重量值'].str.replace(".", "")
-    df_main_weight.loc[~df_main_weight['重量值判断'].str.isdecimal(), '重量值'] = "-1"
-    df_main_weight['重量值'] = np.where(df_main_weight['重量值判断'] == "-1", np.nan, df_main_weight['重量值'])
-
-    # 计算换算值
-    df_main_weight['换算'] = df_main_weight['单位'].replace(para.replace_weight_dict, regex=False)
-
-    # 计算重量
-    df_main_weight['重量(g)'] = np.where(df_main_weight['重量值'].astype(float) * 1 > 0,
-                                       round(
-                                           df_main_weight['重量值'].astype(float) * df_main_weight['换算'].astype(float),
-                                           4), np.nan)
+        df_main_weight['重量(g)'] = calculate_util.weight_g(df_main_weight)
 else:
     # 如果DataFrame为空，创建空的DataFrame并设置重量列为NaN
     df_main_weight = pd.DataFrame(columns=df_main.columns)
@@ -337,67 +342,39 @@ df_traffic_fbm = get_fbm(df_main_weight)
 df_traffic = df_main.merge(df_traffic_fbm, how='left', on='id')
 df_traffic['直发FBM可能性'] = df_traffic['直发FBM可能性'].fillna(0)
 
-df_traffic['预估FBA占比'] = np.where(df_traffic['fba_fees'] * 1 > 0,
-                                 np.fmin(1, df_traffic['fba_fees'] / df_traffic['price']), para.fba_fees_rate)
-df_traffic['预估头程占比'] = np.where(df_traffic['预估FBA占比'] * 1 > 0, np.fmin(1, df_traffic['预估FBA占比'] / 2.5),
-                                para.pre_fees_rate)
-df_traffic['预估货值占比'] = get_cut(df_traffic, 'price', [0, 6, 10, 15, 30, 50, 100, 200, 9999],
-                               [0.08, 0.1, 0.15, 0.2, 0.25, 0.27, 0.3, 0.35])
-convert_type(df_traffic, '预估货值占比', 2)
+df_traffic['预估FBA占比'] = calculate_util.fba_rate(df_traffic)
 
-df_traffic['预估毛利率_FBM'] = df_traffic['gross_margin'] - df_traffic['预估头程占比'] * 2 - para.product_fees_rate
-df_traffic['预估毛利率_FBA'] = df_traffic['gross_margin'] - df_traffic['预估头程占比'] - para.product_fees_rate
-df_traffic['预估毛利率_反推'] = np.where(
-    (df_traffic['直发FBM可能性'] >= 1) & (df_traffic['gross_margin'] >= para.gross_margin_upper),
-    df_traffic['预估毛利率_FBM'], df_traffic['预估毛利率_FBA'])
+df_traffic['预估头程占比'] = calculate_util.pre_rate(df_traffic)
 
-df_traffic['预估毛利率'] = np.where(abs(df_traffic['gross_margin'] * 1) > 0,
-                               np.fmax(-1, np.fmin(1, df_traffic['预估毛利率_反推'])),
-                               np.fmax(-1, np.fmin(1, 1 - df_traffic['预估FBA占比'] - df_traffic['预估头程占比'] -
-                                                   para.referral_fees_rate - df_traffic['预估货值占比'])))
-df_traffic['毛利率级别_上限'] = np.fmin(get_mround(df_traffic, '预估毛利率', '毛利率级别_上限', 0.05), para.gross_rate_upper)
-df_traffic['毛利率级别_下限'] = np.fmax(get_mround(df_traffic, '预估毛利率', '毛利率级别_下限', -0.05), para.gross_rate_lower)
-df_traffic['毛利率级别'] = np.where(df_traffic['预估毛利率'] >= 0, df_traffic['毛利率级别_上限'], df_traffic['毛利率级别_下限'])
+df_traffic['预估货值占比'] = calculate_util.product_rate(df_traffic)
 
-df_traffic['毛估资金利用率'] = df_traffic['预估毛利率'] / (df_traffic['预估头程占比'] + para.product_fees_rate)
+df_traffic['预估货值占比'] = data_cleaning_util.convert_type(df_traffic, '预估货值占比', 2)
+
+df_traffic['预估毛利率'] = calculate_util.profit_rate(df_traffic, site)
+
+df_traffic['毛利率级别'] = calculate_util.profit_rate_tag(df_traffic)
+
+df_traffic['毛估资金利用率'] = calculate_util.product_revenue(df_traffic)
 
 # 5.推荐度相关指标计算
 # M相关指标
-df_traffic['高资金利用率'] = np.where(abs(df_traffic['毛估资金利用率']) > 0,
-                                df_traffic['毛估资金利用率'] / para.product_revenue_std - 1, 0)
+df_traffic['高资金利用率'] = calculate_util.high_product_revenue(df_traffic)
+
 # I相关指标
-# month_available(df_traffic)
+df_traffic['开售月数'] = calculate_util.month_available(df_traffic)
 
 # S相关指标
-get_revenue(df_traffic)
+df_traffic['销额级数'] = calculate_util.get_revenue(df_traffic, site)
 
-conditions_lqs_1 = (df_traffic['预估毛利率'] >= -0.05) & (df_traffic['lqs'] > 0) & (df_traffic['lqs'] <= 8)
-conditions_lqs_2 = (df_traffic['开售月数'] >= 24) & (df_traffic['rating'] >= 4) & (df_traffic['ratings'] >= 10) & (
-        df_traffic['预估毛利率'] >= -0.15) & (df_traffic['lqs'] > 0) & (df_traffic['lqs'] <= 8)
-df_traffic['高销低LQS_pre'] = np.fmin(3, 0.5 + df_traffic['销额级数'] * para.lqs_std / df_traffic['lqs'])
-df_traffic['高销低LQS'] = np.where(conditions_lqs_1 | conditions_lqs_2, df_traffic['高销低LQS_pre'], 0)
+df_traffic['高销低LQS'] = calculate_util.high_sale_low_lqs(df_traffic)
 
-df_traffic['开售月数_QA'] = np.fmin(df_traffic['开售月数'], 24)
-df_traffic['月均QA数'] = np.where(df_traffic['qa'] > 0, round(df_traffic['qa'] / df_traffic['开售月数_QA'], 1), 0)
+df_traffic['月均QA数'] = calculate_util.qa_per_month(df_traffic)
 
-conditions_available = (df_traffic['开售月数'] >= para.available_std) & (
-        df_traffic['monthly_revenue'] >= para.monthly_revenue_C)
+df_traffic[['长期上架少Q&A', '长期上架无A+', '长期上架无视频']] = calculate_util.long_term_sale(df_traffic, site)
 
-df_traffic['长期上架少Q&A'] = np.where(conditions_available,
-                                  np.fmax(-1, para.qa_std - df_traffic['月均QA数'] / para.qa_std), 0)
+df_traffic['类轻小直发FBM'] = calculate_util.light_small_fbm(df_traffic)
 
-df_traffic['长期上架无A+'] = np.where(conditions_available & (df_traffic['ebc_available'] != "Y"), 1, 0)
-
-df_traffic['长期上架无视频'] = np.where(conditions_available & (df_traffic['video_available'] != "Y"), 1, 0)
-
-df_traffic['类轻小直发FBM'] = np.where(df_traffic['直发FBM可能性'] > 0,
-                                  np.fmax(0, 1 + df_traffic['销额级数'] * np.fmin(1, df_traffic['直发FBM可能性'] / 2)), 0)
-
-df_traffic['差评好卖'] = np.where((df_traffic['开售月数'] >= para.available_std) & (
-        df_traffic['monthly_revenue'] >= para.monthly_revenue_C / 2) & (df_traffic['ratings'] >= 10) & (
-                                      df_traffic['rating'] >= 3) & (df_traffic['rating'] < 4) & (
-                                      abs(df_traffic['预估毛利率']) > 0) & (df_traffic['category_bsr_growth'] >= -0.5),
-                              0.5 + df_traffic['销额级数'] * (4.5 - df_traffic['rating']), 0)
+df_traffic['差评好卖'] = calculate_util.low_star_high_sale(df_traffic, site)
 
 # 知名品牌
 df_traffic_brand = df_traffic[df_traffic['brand'].notnull()]
@@ -410,7 +387,7 @@ df_traffic['combined_kw'] = df_traffic['title'] + "" + df_traffic['sub_category'
 
 df_traffic[['疑似节日性', '节日名']] = df_traffic.apply(lambda row: pd.Series(match_holidays(row)), axis=1)
 
-df_traffic['知名品牌_1'] = np.where(df_traffic['疑似知名品牌'] * 1 > 0,
+df_traffic['知名品牌_1'] = np.where(df_traffic['疑似知名品牌'] > 0,
                                 -df_traffic['疑似知名品牌'] / np.where(df_traffic['疑似节日性'] * 1 > 0, 2, 1), 0)
 
 conditions_brand = (df_traffic['seller_type'] == 'AMZ') | (df_traffic['buybox_seller'] == 'Amazon') | (
@@ -425,42 +402,22 @@ df_traffic['知名品牌'] = df_traffic['知名品牌'].fillna(0)
 df_traffic['疑似节日性'] = np.where(df_traffic['疑似节日性'] * 1 > 3, "3+", df_traffic['疑似节日性'])
 
 # 是否个人定制
-custom_kw = ['custom', 'personalize', 'personalized', 'custom-made', 'customized', 'made-to-order']
-df_traffic['custom_kw'] = df_traffic.apply(lambda row: pd.Series(match_custom_kw(row)), axis=1)
-df_traffic['是否个人定制'] = np.where(df_traffic['custom_kw'] * 1 > 0, 1, 0)
+df_traffic['custom_kw'] = df_traffic.apply(lambda row: pd.Series(calculate_util.match_custom_kw(row)),
+                                           axis=1)
+df_traffic['是否个人定制'] = np.where(df_traffic['custom_kw'] > 0, 1, 0)
 
 # 是否翻新
-df_traffic.loc[df_traffic['title'].astype(str).str.contains('renewed', na=False, regex=False), '是否翻新'] = 1
-df_traffic['是否翻新'] = np.where(df_traffic['是否翻新'] == 1, 1, 0)
+df_traffic['是否翻新'] = calculate_util.get_renewed(df_traffic)
 
 # L相关指标
-df_traffic['平均变体月销额等级'] = np.where(df_traffic['monthly_revenue'] * 1 > 0, np.log2(
-    df_traffic['monthly_revenue'] / df_traffic['variations'] / (para.monthly_revenue_C / 2)), 0)
-df_traffic['变体等级'] = np.log2(df_traffic['variations'])
-df_traffic['少变体'] = np.where(df_traffic['variations'] == 1, 0,
-                             np.fmax(-10, np.fmin(0, df_traffic['平均变体月销额等级'] - 0.5 * df_traffic['变体等级'] + 0.5)))
+df_traffic['平均变体月销额等级'] = calculate_util.revenue_per_variations(df_traffic, site)
+df_traffic['变体等级'] = calculate_util.variations_tag(df_traffic)
+df_traffic['少变体'] = calculate_util.few_variations(df_traffic)
 
 # E相关指标
-conditions_new_product = (df_traffic['开售月数'] < para.available_std)
+df_traffic[['新品爬坡快', '新品增评好', '新品NSR', '新品AC标']] = calculate_util.product_new(df_traffic, site)
 
-df_traffic['新品爬坡快'] = np.where(conditions_new_product & (df_traffic['monthly_revenue'] * 1 >= 0), np.log2(
-    df_traffic['monthly_revenue'] / df_traffic['开售月数'] / (para.monthly_revenue_C / para.revenue_month_C)),
-                               0)
-
-df_traffic['新品增评好'] = np.where(
-    conditions_new_product & (df_traffic['rating'] * 1 >= 4) & (df_traffic['ratings'] * 1 >= 10),
-    np.fmax(0, np.fmin(2, np.log(
-        df_traffic['ratings'] / df_traffic['开售月数'] / df_traffic['variations'] / np.log(
-            5)))), 0)
-
-df_traffic['新品NSR'] = np.where(conditions_new_product & (df_traffic['new_release'] == "Y"), 1, 0)
-
-df_traffic['新品AC标'] = np.where(conditions_new_product & (df_traffic['ac'] == "Y"), 1, 0)
-
-df_traffic['销级星数比'] = np.where(df_traffic['rating'] * 1 > 0,
-                               df_traffic['销额级数'] / round(2 + df_traffic['rating'] / 100), 0)
-
-df_traffic['少评好卖'] = np.where(df_traffic['销额级数'] * 1 > 0, np.fmax(-1, round(df_traffic['销级星数比'] - 1, 2)), 0)
+df_traffic['少评好卖'] = calculate_util.few_star_high_sale(df_traffic)
 
 # 推荐度计算
 df_recommend = df_traffic[
@@ -503,9 +460,10 @@ traffic_revenue_pass['revenue_rank'] = traffic_revenue_pass.groupby(df_traffic['
 traffic_top5_df = traffic_revenue_pass.query('revenue_rank <= 5')
 
 # 聚合表生成
-traffic_df = traffic_top5_df.groupby('related_asin').agg({'relevance': 'first',
-                                                          'asin': lambda x: ','.join(x.astype(str)),
-                                                          '数据更新时间': 'first'}).reset_index()
+traffic_df = traffic_top5_df.groupby('related_asin').agg(
+    {'relevance': 'first',
+     'asin': lambda x: ','.join(x.astype(str)),
+     '数据更新时间': 'first'}).reset_index()
 
 # 相关竞品款数
 traffic_count = product_count(df_traffic, '相关竞品款数')

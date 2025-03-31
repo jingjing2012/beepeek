@@ -6,11 +6,11 @@ from conn import mysql_config as config
 update_date = str(config.sellersprite_database)[-6:-2] + "-" + str(config.sellersprite_database)[-2:] + "-01"
 
 # 辅助表
-holiday_sql = 'select 节日关键词 from ' + path.product_database + '.' + path.product_holiday
-famous_brand_sql = 'select brand,预估影响力 as "疑似知名品牌" from ' + path.product_database + '.' + path.product_famous_brand
-category_risk_sql = 'select category_path,prohibited_risk from ' + path.product_database + '.' + path.product_category_risk
-seller_self_sql = 'select buybox_seller,seller_status from ' + path.product_database + '.' + path.seller_self
-brand_self_sql = 'select brand,brand_status from ' + path.product_database + '.' + path.brand_self
+holiday_sql = 'select 节日关键词 from ' + path.product_holiday
+famous_brand_sql = 'select brand,预估影响力 as "疑似知名品牌" from ' + path.product_famous_brand
+category_risk_sql = 'select category_path,prohibited_risk from ' + path.product_category_risk
+seller_self_sql = 'select buybox_seller,seller_status from ' + path.seller_self
+brand_self_sql = 'select brand,brand_status from ' + path.brand_self
 
 # cpc表
 clear_sql_product_cpc = "TRUNCATE TABLE " + path.product_cpc
@@ -86,15 +86,15 @@ update_sql_sub_category = "UPDATE pt_product_get_group INNER JOIN pt_product_rep
                           "pt_product_report.asin SET pt_product_get_group.sub_category=pt_product_report.sub_category," \
                           "pt_product_get_group.fba_fees=pt_product_report.fba_fees"
 
-sql_get_group = 'select * from ' + path.pt_product_get_group
+sql_get_group = 'select * from ' + path.pt_product_get_group + ' limit 100'
 
-sql_get_group_status = 'select * from ' + path.pt_product_get_group + ' where status=-10'
+sql_get_group_status = 'select * from ' + path.pt_product_get_group + ' where status=-10' + ' limit 100'
 
-sql_get_duplicate = 'select * from ' + path.pt_product_duplicate
+sql_get_duplicate = 'select * from ' + path.pt_product_duplicate + ' limit 100'
 
-sql_relevance_asins = 'select * from ' + path.pt_relevance_asins
+sql_relevance_asins = 'select * from ' + path.pt_relevance_asins + ' limit 100'
 
-sql_group_predict = 'select * from ' + path.product_group_predict + ' WHERE `数据更新时间`="' + update_date + '"'
+sql_group_predict = 'select * from ' + path.product_group_predict + ' WHERE `数据更新时间`="' + update_date + '"' + ' limit 100'
 
 # group表
 
@@ -121,7 +121,7 @@ sql_asin_group = "SELECT * FROM pt_product_get_group WHERE `status`=0"
 sql_duplicate_update = """
 UPDATE pt_product_get_group
 INNER JOIN pt_product_duplicate ON pt_product_get_group.asin = pt_product_duplicate.asin 
-SET pt_product_get_group.`status` = "-30" 
+SET pt_product_get_group.`status` = -30 
 WHERE
 	pt_product_duplicate.`duplicate_tag` = "10+";
 """
@@ -398,10 +398,10 @@ create_sql_group_self = "CREATE TABLE `pt_clue_asin` (" \
                         "ROW_FORMAT=DYNAMIC COMMENT='当月自主提报需要爬取竞品数据的线索';"
 
 # 自主提报查重
-sql_sellersprite_clue_self = 'select `asin`,`data_tag` from ' + path.pt_clue_asin
+sql_sellersprite_clue_self = 'select asin,country,data_tag from ' + path.pt_clue_asin
 
 # 竞品提报查重
-sql_sellersprite_clue_position = 'select `asin` from ' + path.pt_clue_asin
+sql_sellersprite_clue_position = 'select asin,update_time from ' + path.pt_clue_asin
 
 # 店铺挖掘提报查重
 sql_sellersprite_clue_shop = 'select `asin` from ' + path.pt_seed_asin
@@ -481,44 +481,74 @@ duplicate_sql10 = 'UPDATE product_group_history SET `重复利基`=5 WHERE `数�
                   'product_report_self.`小类目` IS NOT NULL) group_duplicate);'
 
 # clue_self表
-clue_sql = 'SELECT pt_product_report.*,SUBSTRING_INDEX(pt_product_report.category_path,":",2) as "二级类目",' \
-           'pt_clue_asin.update_time "数据更新时间" FROM pt_clue_asin LEFT JOIN pt_product_report ON ' \
-           'pt_clue_asin.asin=pt_product_report.asin WHERE pt_product_report.id>0 and pt_clue_asin.`status`=1'
+clue_sql = """
+SELECT
+	pt_product_report.*,
+	SUBSTRING_INDEX( pt_product_report.category_path, ":", 2 ) AS "二级类目",
+	pt_clue_asin.country AS site,
+	pt_clue_asin.update_time AS "数据更新时间" 
+FROM
+	pt_clue_asin
+	LEFT JOIN pt_product_report ON pt_clue_asin.asin = pt_product_report.asin 
+	AND pt_clue_asin.country = pt_product_report.country 
+WHERE
+	pt_product_report.id > 0 
+	AND pt_clue_asin.`status` =1
+"""
 
-update_clue_sql = 'UPDATE pt_clue_asin SET `status`=2 WHERE asin IN(SELECT asin FROM pt_product_get_cpc)'
+update_clue_sql = """
+UPDATE pt_clue_asin
+INNER JOIN pt_product_get_cpc ON pt_clue_asin.asin = pt_product_get_cpc.asin 
+AND pt_clue_asin.country = pt_product_get_cpc.country 
+SET `status` =2
+"""
 
-update_sql_group_self_tag = "UPDATE product_tag_self INNER JOIN product_group_tag_self ON " \
-                            "product_tag_self.data_id=product_group_tag_self.data_id " \
-                            "SET product_tag_self.traffic_status=1"
+update_sql_group_self_tag = """
+UPDATE product_tag_self
+INNER JOIN product_group_tag_self ON product_tag_self.data_id = product_group_tag_self.data_id 
+SET product_tag_self.traffic_status =1
+"""
 
-update_sql_product_tag_self = "UPDATE product_tag_self INNER JOIN product_cpc_tag_temporary " \
-                              "ON product_tag_self.data_id=product_cpc_tag_temporary.data_id " \
-                              "SET product_tag_self.cpc_status=1," \
-                              "product_tag_self.`SP_AMZ差异度分布`=product_cpc_tag_temporary.`SP_AMZ差异度分布`," \
-                              "product_tag_self.`加权CPC分布`=product_cpc_tag_temporary.`加权CPC分布`," \
-                              "product_tag_self.`市场蓝海度分布`=product_cpc_tag_temporary.`市场蓝海度分布`"
+update_sql_product_tag_self = """
+UPDATE product_tag_self
+INNER JOIN product_cpc_tag_temporary ON product_tag_self.data_id = product_cpc_tag_temporary.data_id 
+SET product_tag_self.cpc_status = 1,
+product_tag_self.`SP_AMZ差异度分布` = product_cpc_tag_temporary.`SP_AMZ差异度分布`,
+product_tag_self.`加权CPC分布` = product_cpc_tag_temporary.`加权CPC分布`,
+product_tag_self.`市场蓝海度分布` = product_cpc_tag_temporary.`市场蓝海度分布`
+"""
 
-update_sql_group_sampling_tag = "UPDATE product_tag_sampling INNER JOIN product_group_tag_sampling ON " \
-                                "product_tag_sampling.data_id=product_group_tag_sampling.data_id " \
-                                "SET product_tag_sampling.traffic_status=1"
+update_sql_group_sampling_tag = """
+UPDATE product_tag_sampling
+INNER JOIN product_group_tag_sampling ON product_tag_sampling.data_id = product_group_tag_sampling.data_id 
+SET product_tag_sampling.traffic_status =1
+"""
 
-update_sql_product_tag_sampling = "UPDATE product_tag_sampling INNER JOIN product_cpc_tag_temporary " \
-                                  "ON product_tag_sampling.data_id=product_cpc_tag_temporary.data_id " \
-                                  "SET product_tag_sampling.cpc_status=1," \
-                                  "product_tag_sampling.`SP_AMZ差异度分布`=product_cpc_tag_temporary.`SP_AMZ差异度分布`," \
-                                  "product_tag_sampling.`加权CPC分布`=product_cpc_tag_temporary.`加权CPC分布`," \
-                                  "product_tag_sampling.`市场蓝海度分布`=product_cpc_tag_temporary.`市场蓝海度分布`"
+update_sql_product_tag_sampling = """
+UPDATE product_tag_sampling
+INNER JOIN product_cpc_tag_temporary ON product_tag_sampling.data_id = product_cpc_tag_temporary.data_id 
+SET product_tag_sampling.cpc_status = 1,
+product_tag_sampling.`SP_AMZ差异度分布` = product_cpc_tag_temporary.`SP_AMZ差异度分布`,
+product_tag_sampling.`加权CPC分布` = product_cpc_tag_temporary.`加权CPC分布`,
+product_tag_sampling.`市场蓝海度分布` = product_cpc_tag_temporary.`市场蓝海度分布`
+"""
 
-update_clue_cpc_sql = 'UPDATE pt_product_get_cpc SET `status`=2 WHERE asin IN(SELECT asin FROM pt_product_get_group)'
+update_clue_cpc_sql = """
+UPDATE pt_product_get_cpc
+INNER JOIN pt_product_get_group ON pt_product_get_cpc.asin = pt_product_get_group.asin 
+AND pt_product_get_cpc.country = pt_product_get_group.country 
+SET pt_product_get_cpc.`status` = 2
+"""
 
-sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where status=1'
+sql_asin = 'select * from pt_product_get_cpc where `status`=1'
 # sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where id>=323394'
 # sql_asin = 'select * from ' + path.pt_product_get_cpc + ' where update_time>="2024-09-01"'
-sql_kw = 'select ' + path.pt_keywords + '.*,pt_product.price,pt_product.recommend,pt_product.update_time as ' + \
-         '"数据更新时间" from (' + sql_asin + ') pt_product left join ' + path.pt_keywords + ' on pt_product.asin = ' + \
-         path.pt_keywords + '.asin'
-sql_cpc = 'select DISTINCT ' + path.cpc_from_keywords + '.* from (' + sql_kw + ') pt_kw left join ' + \
-          path.cpc_from_keywords + ' on pt_kw.keyword = ' + path.cpc_from_keywords + '.keyword where ' + \
+
+sql_kw = 'select pt_keywords.*,pt_product.country,pt_product.price,pt_product.recommend,pt_product.update_time as ' + \
+         '"数据更新时间" from (' + sql_asin + ') pt_product left join pt_keywords on pt_product.asin = pt_keywords.asin'
+
+sql_cpc = 'select DISTINCT cpc_from_keywords.* from (' + sql_kw + ') pt_kw left join cpc_from_keywords ' + \
+          'on pt_kw.keyword = cpc_from_keywords.keyword where ' + \
           '(cpc_from_keywords.bid_rangeMedian + cpc_from_keywords.bid_rangeEnd)>0'
 
 # sql_cpc ='select DISTINCT cpc_from_keywords.* from (select * from pt_product_get_cpc where `status`=1) pt_kw
@@ -527,7 +557,7 @@ sql_cpc = 'select DISTINCT ' + path.cpc_from_keywords + '.* from (' + sql_kw + '
 
 update_clue_group_sql = 'UPDATE pt_product_get_group SET `status`=2 WHERE asin IN(SELECT DISTINCT asin FROM pt_relevance_asins)'
 
-sql_asin_self = 'select asin as "related_asin",update_time as "数据更新时间" from ' + path.pt_product_get_group + ' where status=1'
+sql_asin_self = 'select asin as "related_asin",update_time as "数据更新时间" from pt_product_get_group where status=1'
 
 sql_relevance_self = 'SELECT ' + path.pt_relevance_asins + '.* FROM (' + sql_asin_self + ') pt_product LEFT JOIN ' + \
                      path.pt_relevance_asins + ' ON pt_product.related_asin = ' + path.pt_relevance_asins + '.asin'
@@ -619,17 +649,69 @@ WHERE
 	AND expand_competitors.tag_status =0
 """
 
-update_position_sql1 = 'UPDATE ' + path.expand_competitors + ' SET tag_status=1 WHERE id IN' \
-                                                             '(SELECT expand_competitors_id FROM pt_clue_tag)'
-update_position_sql2 = 'UPDATE ' + path.expand_competitors + ' SET tag_status=-1 WHERE id NOT IN' \
-                                                             '(SELECT expand_competitors_id FROM pt_clue_tag)'
+update_price_tag_sql = """
+UPDATE pt_clue_tag 
+SET price_tag = NULL 
+WHERE
+	LENGTH( price_tag )<1
+"""
 
-update_position_sql3 = 'UPDATE ' + path.expand_competitors + ' SET profit_status=1 WHERE asin IN' \
-                                                             '(SELECT ASIN FROM pt_clue_profit)'
+update_position_sql1 = """
+UPDATE expand_competitors 
+SET tag_status = 1 
+WHERE
+	id IN (
+	SELECT
+		expand_competitors_id 
+FROM
+	pt_clue_tag)
+"""
+update_position_sql2 = """
+UPDATE expand_competitors 
+SET tag_status =- 1 
+WHERE
+	id NOT IN (
+	SELECT
+		expand_competitors_id 
+FROM
+	pt_clue_tag)
+"""
 
-update_position_sql4 = 'UPDATE ' + path.pt_clue_asin + ' SET kw_status=1 WHERE asin IN (SELECT asin FROM pt_clue_kw)'
+update_position_sql3 = """
+UPDATE expand_competitors 
+SET profit_status = 1 
+WHERE
+	asin IN (
+	SELECT
+		ASIN 
+FROM
+	pt_clue_profit)
+"""
 
-sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin where clue_status=1'
+update_position_sql4 = """
+UPDATE pt_clue_asin 
+SET kw_status = 1 
+WHERE
+	asin IN (
+	SELECT
+		asin 
+FROM
+	pt_clue_kw)
+"""
+
+sql_clue_asin = """
+SELECT
+	asin AS ASIN,
+	length_max,
+	length_mid,
+	length_min,
+	weight,
+	price_value 
+FROM
+	pt_clue_asin 
+WHERE
+	clue_status =1
+"""
 # sql_clue_asin = 'select asin as ASIN,length_max,length_mid,length_min,weight,price_value from pt_clue_asin'
 # 店铺挖掘
 sql_brand_report = 'SELECT * FROM ' + path.pt_brand_competing_report + ' WHERE brand_status + seller_status = 2'
@@ -680,6 +762,7 @@ WHERE
 	AND pt_clue_asin.kw_status = 0 
 	AND (
 	LENGTH( clue_info.image )+ LENGTH( clue_info.title ))>0
+	# AND pt_clue_asin.update_time="2025-03-19"
 """
 
 sql_kw_ai_id_start = """

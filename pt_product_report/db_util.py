@@ -1,4 +1,48 @@
 # 做数据库操作，连接数据库等等
+import conn.mysql_config as config
+
+
+def connet_sellersprite_db_sql(sellersprite_database):
+    return f"mysql+pymysql://{config.sellersprite_username}:{config.sellersprite_password}"f"@{config.sellersprite_hostname}/{sellersprite_database}?charset=utf8mb4"
+
+
+def report_asin_sql(id_start, id_increment):
+    sql_report_asin = """
+    SELECT
+	*,
+	SUBSTRING_INDEX( category_path, ":", 2 ) AS "二级类目" 
+    FROM
+	pt_product_report
+    """
+    sql_asin = sql_report_asin + ' WHERE id >' + str(id_start) + ' ORDER BY id ASC LIMIT ' + str(id_increment)
+    return sql_asin
+
+
+def cpc_asin_sql(id_start, id_increment):
+    sql_cpc_asin = """
+    SELECT
+	* 
+    FROM
+	pt_product_get_cpc 
+    WHERE
+	`status` = 1
+    """
+    sql_asin = sql_cpc_asin + ' AND id >' + str(id_start) + ' ORDER BY id ASC LIMIT ' + str(id_increment)
+    return sql_asin
+
+
+def kw_sql(id_start, id_increment):
+    sql_kw = "select pt_keywords.*,pt_product.price,pt_product.recommend from (" \
+             + cpc_asin_sql(id_start, id_increment) \
+             + ") pt_product left join pt_keywords on pt_product.asin = pt_keywords.asin where pt_keywords.id >0"
+    return sql_kw
+
+
+def cpc_sql(id_start, id_increment):
+    sql_cpc = "select DISTINCT cpc_from_keywords.* from (" + kw_sql(id_start, id_increment) \
+              + ") pt_kw left join cpc_from_keywords on pt_kw.keyword = cpc_from_keywords.keyword"
+    return sql_cpc
+
 
 def group_asin_sql(id_start, id_increment):
     sql_group_asin = """
